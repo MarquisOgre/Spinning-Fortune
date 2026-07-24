@@ -1,0 +1,161 @@
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
+import type { Member } from "@/lib/lottery";
+
+const PALETTE = [
+  "#7c3aed", "#c084fc", "#f59e0b", "#fbbf24", "#ec4899", "#f472b6",
+  "#10b981", "#34d399", "#3b82f6", "#60a5fa", "#ef4444", "#f87171",
+  "#8b5cf6", "#a78bfa", "#d97706", "#eab308", "#db2777", "#e879f9",
+  "#059669", "#22c55e",
+];
+
+export type WheelHandle = {
+  spinTo: (index: number) => Promise<void>;
+  canvas: HTMLCanvasElement | null;
+};
+
+type Props = { members: Member[]; size?: number };
+
+export const SpinningWheel = forwardRef<WheelHandle, Props>(function SpinningWheel(
+  { members, size = 520 },
+  ref,
+) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [rotation, setRotation] = useState(0);
+  const rotRef = useRef(0);
+
+  const draw = (rot: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = size / 2 - 12;
+    const n = Math.max(members.length, 1);
+    const step = (Math.PI * 2) / n;
+
+    const grd = ctx.createRadialGradient(cx, cy, r - 8, cx, cy, r + 12);
+    grd.addColorStop(0, "#f5c34a");
+    grd.addColorStop(1, "#8a5a12");
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rot);
+
+    members.forEach((m, i) => {
+      const start = i * step;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, r, start, start + step);
+      ctx.closePath();
+      const c1 = PALETTE[i % PALETTE.length];
+      const g = ctx.createLinearGradient(0, 0, Math.cos(start + step / 2) * r, Math.sin(start + step / 2) * r);
+      g.addColorStop(0, c1);
+      g.addColorStop(1, shade(c1, -25));
+      ctx.fillStyle = m.is_winner ? "#3a2f4a" : g;
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.save();
+      ctx.rotate(start + step / 2);
+      ctx.textAlign = "right";
+      ctx.fillStyle = m.is_winner ? "#6b6478" : "#fff";
+      ctx.font = "600 15px 'Inter', sans-serif";
+      const label = m.is_winner ? `~${m.name}~` : m.name;
+      ctx.fillText(truncate(label, 16), r - 18, 5);
+      ctx.restore();
+    });
+
+    ctx.restore();
+
+    const hub = ctx.createRadialGradient(cx, cy, 4, cx, cy, 36);
+    hub.addColorStop(0, "#fff5c8");
+    hub.addColorStop(1, "#a67512");
+    ctx.fillStyle = hub;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 32, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#3b2a08";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  };
+
+  useEffect(() => {
+    draw(rotation);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members, size, rotation]);
+
+  useImperativeHandle(ref, () => ({
+    canvas: canvasRef.current,
+    spinTo: (index: number) =>
+      new Promise<void>((resolve) => {
+        const n = members.length;
+        if (n === 0) return resolve();
+        const step = (Math.PI * 2) / n;
+        const targetSlice = -Math.PI / 2 - (index * step + step / 2);
+        const spins = 6 + Math.random() * 2;
+        const finalRot = targetSlice - Math.PI * 2 * spins;
+        const start = rotRef.current;
+        const delta = ((finalRot - start) % (Math.PI * 2)) - Math.PI * 2 * spins;
+        const duration = 6500;
+        const t0 = performance.now();
+        const tick = (t: number) => {
+          const elapsed = t - t0;
+          const p = Math.min(elapsed / duration, 1);
+          const eased = 1 - Math.pow(1 - p, 4);
+          const cur = start + delta * eased;
+          rotRef.current = cur;
+          setRotation(cur);
+          if (p < 1) requestAnimationFrame(tick);
+          else resolve();
+        };
+        requestAnimationFrame(tick);
+      }),
+  }));
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <canvas ref={canvasRef} className="drop-shadow-[0_0_40px_rgba(245,197,66,0.35)]" />
+      <div
+        className="absolute left-1/2 -translate-x-1/2 -top-2 z-10"
+        style={{
+          width: 0,
+          height: 0,
+          borderLeft: "18px solid transparent",
+          borderRight: "18px solid transparent",
+          borderTop: "34px solid #f5c34a",
+          filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.5))",
+        }}
+      />
+    </div>
+  );
+});
+
+function truncate(s: string, n: number) {
+  return s.length > n ? s.slice(0, n - 1) + "\u2026" : s;
+}
+
+function shade(hex: string, pct: number) {
+  const c = hex.replace("#", "");
+  const num = parseInt(c, 16);
+  let r = (num >> 16) + Math.round((pct / 100) * 255);
+  let g = ((num >> 8) & 0xff) + Math.round((pct / 100) * 255);
+  let b = (num & 0xff) + Math.round((pct / 100) * 255);
+  r = Math.max(0, Math.min(255, r));
+  g = Math.max(0, Math.min(255, g));
+  b = Math.max(0, Math.min(255, b));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
