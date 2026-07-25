@@ -8,6 +8,7 @@ export type Member = {
   is_winner: boolean;
   won_month: string | null;
   won_at: string | null;
+  status: "active" | "inactive" | "used";
 };
 
 export type Settings = {
@@ -17,6 +18,8 @@ export type Settings = {
   whatsapp_group_name: string | null;
   lottery_title: string;
   prize_amount: string | null;
+  logo_url: string | null;
+  favicon_url: string | null;
 };
 
 export type Winner = {
