@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { ThemeProvider } from "@/hooks/use-theme";
 
 function NotFoundComponent() {
   return (
@@ -133,10 +134,27 @@ function RootComponent() {
     return () => sub.subscription.unsubscribe();
   }, [router]);
 
+  // Apply dynamic favicon from settings, if configured.
+  useEffect(() => {
+    supabase.from("settings").select("favicon_url").eq("id", 1).maybeSingle().then(({ data }) => {
+      const url = (data as { favicon_url?: string } | null)?.favicon_url;
+      if (!url) return;
+      let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+      link.href = url;
+    });
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
-      <Toaster theme="dark" position="top-center" richColors />
+      <ThemeProvider>
+        <Outlet />
+        <Toaster position="top-center" richColors />
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
