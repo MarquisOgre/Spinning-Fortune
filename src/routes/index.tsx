@@ -229,30 +229,43 @@ function Index() {
         <main className="flex flex-col items-center justify-start min-h-0 overflow-y-auto">
           <SpinningWheel ref={wheelRef} members={wheelMembers} size={420} />
 
-          <div className="text-center mt-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">{monthLabel}</p>
-            <h1 className="text-3xl md:text-4xl font-serif text-gold mt-1">Spin for {monthLabel}</h1>
-            {settings && (
-              <p className="mt-2 text-sm text-muted-foreground">
-                {alreadySpunThisMonth
-                  ? "This month's winner has been drawn."
-                  : dateOk
-                    ? isAdmin ? "The wheel is unlocked." : "Only the admin can spin today."
-                    : `Unlocks on the ${ordinal(settings.spin_day)} of each month.`}
-              </p>
-            )}
-          </div>
+          <div className="mt-4 flex flex-col md:flex-row items-center justify-center gap-4">
+  <h1 className="text-3xl md:text-4xl font-serif text-gold">
+    Spin for {monthLabel}
+  </h1>
 
-          <div className="mt-4 flex flex-col items-center gap-2 pb-4">
-            <Button
-              size="lg"
-              onClick={handleSpin}
-              disabled={!canSpin}
-              className="bg-gold text-primary-foreground font-serif text-base px-8 h-12 rounded-full shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-50"
-            >
-              {spinning ? "Spinning\u2026" : alreadySpunThisMonth ? "Already drawn" : !dateOk ? (<><Lock className="h-4 w-4 mr-2" /> Locked</>) : "Spin the Wheel"}
-            </Button>
-          </div>
+  <Button
+    size="lg"
+    onClick={handleSpin}
+    disabled={!canSpin}
+    className="bg-gold text-primary-foreground font-serif text-base px-8 h-12 rounded-full shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-50"
+  >
+    {spinning
+      ? "Spinning…"
+      : alreadySpunThisMonth
+      ? "Already drawn"
+      : !dateOk
+      ? (
+        <>
+          <Lock className="h-4 w-4 mr-2" />
+          Locked
+        </>
+      )
+      : "Spin the Wheel"}
+  </Button>
+</div>
+
+{settings && (
+  <p className="mt-2 text-center text-sm text-muted-foreground">
+    {alreadySpunThisMonth
+      ? "This month's winner has been drawn."
+      : dateOk
+      ? isAdmin
+        ? "The wheel is unlocked."
+        : "Only the admin can spin today."
+      : `Unlocks on the ${ordinal(settings.spin_day)} of each month.`}
+  </p>
+)}
 
           {winner && settings && (
             <WinnerCard
