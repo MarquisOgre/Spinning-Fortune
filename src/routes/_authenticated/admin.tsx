@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { fetchMembers, fetchSettings, type Member, type Settings } from "@/lib/lottery";
-import { ArrowLeft, Save, Trash2, Plus, LogOut, RotateCcw } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Plus, LogOut, RotateCcw, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/hooks/use-theme";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin Panel \u2014 Lucky Draw" }] }),
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 function AdminPage() {
   const navigate = useNavigate();
+  const { theme, toggle } = useTheme();
   const [members, setMembers] = useState<Member[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,7 +41,7 @@ function AdminPage() {
     const nextPos = (members.at(-1)?.position ?? 0) + 1;
     const { data, error } = await supabase
       .from("members")
-      .insert({ name: `Member ${nextPos}`, position: nextPos })
+      .insert({ name: `Member ${nextPos}`, position: nextPos, status: "active" })
       .select()
       .single();
     if (error) return toast.error(error.message);
@@ -58,7 +60,7 @@ function AdminPage() {
     const { error: e1 } = await supabase.from("winners").delete().neq("id", zero);
     const { error: e2 } = await supabase
       .from("members")
-      .update({ is_winner: false, won_month: null, won_at: null })
+      .update({ is_winner: false, status: "active", won_month: null, won_at: null })
       .neq("id", zero);
     if (e1 || e2) return toast.error((e1 || e2)!.message);
     toast.success("Cycle reset");
@@ -74,12 +76,14 @@ function AdminPage() {
       whatsapp_group_name: settings.whatsapp_group_name,
       lottery_title: settings.lottery_title,
       prize_amount: settings.prize_amount,
+      logo_url: settings.logo_url,
+      favicon_url: settings.favicon_url,
     }).eq("id", 1);
     if (sErr) { toast.error(sErr.message); setSaving(false); return; }
     for (const m of members) {
       const { error } = await supabase
         .from("members")
-        .update({ name: m.name, phone: m.phone, position: m.position })
+        .update({ name: m.name, phone: m.phone, position: m.position, status: m.status })
         .eq("id", m.id);
       if (error) { toast.error(error.message); setSaving(false); return; }
     }
@@ -104,9 +108,14 @@ function AdminPage() {
             <ArrowLeft className="h-4 w-4" /> Back to wheel
           </Link>
           <h1 className="text-2xl text-gold font-serif">Admin Panel</h1>
-          <Button variant="ghost" size="sm" onClick={signOut}>
-            <LogOut className="h-4 w-4 mr-2" /> Sign out
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={signOut}>
+              <LogOut className="h-4 w-4 mr-2" /> Sign out
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -134,6 +143,14 @@ function AdminPage() {
             <Label>WhatsApp Group Invite Link</Label>
             <Input value={settings.whatsapp_group_link ?? ""} placeholder="https://chat.whatsapp.com/\u2026" onChange={(e) => setSettings({ ...settings, whatsapp_group_link: e.target.value })} />
           </div>
+          <div>
+            <Label>Logo URL</Label>
+            <Input value={settings.logo_url ?? ""} placeholder="https://\u2026/logo.png" onChange={(e) => setSettings({ ...settings, logo_url: e.target.value })} />
+          </div>
+          <div>
+            <Label>Favicon URL</Label>
+            <Input value={settings.favicon_url ?? ""} placeholder="https://\u2026/favicon.png" onChange={(e) => setSettings({ ...settings, favicon_url: e.target.value })} />
+          </div>
           <Button onClick={saveAll} disabled={saving} className="w-full bg-gold text-primary-foreground font-semibold">
             <Save className="h-4 w-4 mr-2" /> {saving ? "Saving\u2026" : "Save all"}
           </Button>
@@ -158,7 +175,15 @@ function AdminPage() {
                 <div className="w-8 text-center text-primary font-semibold">{m.position}</div>
                 <Input value={m.name} onChange={(e) => updateMember(m.id, { name: e.target.value })} className="flex-1" />
                 <Input value={m.phone ?? ""} placeholder="Phone" onChange={(e) => updateMember(m.id, { phone: e.target.value })} className="w-40" />
-                {m.is_winner && <span className="text-xs text-primary">\uD83C\uDFC6 {m.won_month}</span>}
+                <select
+                  value={m.status}
+                  onChange={(e) => updateMember(m.id, { status: e.target.value as Member["status"] })}
+                  className="text-xs rounded-md border border-input bg-background px-2 py-1.5"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="used">Used</option>
+                </select>
                 <Button size="icon" variant="ghost" onClick={() => deleteMember(m.id)}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
@@ -167,6 +192,12 @@ function AdminPage() {
           </div>
         </section>
       </div>
+      <footer className="border-t border-border/60 bg-card/40 mt-8">
+        <div className="max-w-6xl mx-auto px-6 h-10 flex items-center justify-center text-xs text-muted-foreground">
+          © {new Date().getFullYear()} • Developed with <span className="text-destructive mx-1">♥</span> by
+          <span className="ml-1 font-semibold text-foreground">Dexorzo Creations</span>
+        </div>
+      </footer>
     </div>
   );
 }
