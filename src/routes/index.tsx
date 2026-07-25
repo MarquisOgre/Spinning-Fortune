@@ -3,8 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Sparkles, Crown, Lock, Share2, Download, Trophy, Settings as SettingsIcon } from "lucide-react";
+import { Crown, Lock, Share2, Download, Trophy, Settings as SettingsIcon, Sun, Moon, History } from "lucide-react";
 import { SpinningWheel, type WheelHandle } from "@/components/SpinningWheel";
+import { useTheme } from "@/hooks/use-theme";
 import {
   fetchMembers,
   fetchSettings,
@@ -15,7 +16,6 @@ import {
   buildWhatsappShareText,
   whatsappShareUrl,
   type Member,
-  type Settings,
   type Winner,
 } from "@/lib/lottery";
 
@@ -25,8 +25,9 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const wheelRef = useRef<WheelHandle>(null);
+  const { theme, toggle } = useTheme();
   const [members, setMembers] = useState<Member[]>([]);
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const [settings, setSettings] = useState<Awaited<ReturnType<typeof fetchSettings>> | null>(null);
   const [winners, setWinners] = useState<Winner[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [session, setSession] = useState(false);
@@ -54,7 +55,14 @@ function Index() {
     });
   }, []);
 
-  const eligible = useMemo(() => members.filter((m) => !m.is_winner), [members]);
+  const eligible = useMemo(
+    () => members.filter((m) => m.status === "active" && !m.is_winner),
+    [members],
+  );
+  const wheelMembers = useMemo(
+    () => (members.length ? members.filter((m) => m.status !== "inactive") : placeholderMembers),
+    [members],
+  );
   const monthKey = currentMonthKey();
   const monthLabel = currentMonthLabel();
   const alreadySpunThisMonth = winners.some((w) => w.month_year === monthKey);
@@ -94,26 +102,36 @@ function Index() {
     setWinner(null);
     setVideoUrl(null);
 
-    const eligibleIdx = members.map((m, i) => ({ m, i })).filter(({ m }) => !m.is_winner);
-    const pickIndexInMembers = eligibleIdx[Math.floor(Math.random() * eligibleIdx.length)].i;
-    const picked = members[pickIndexInMembers];
+    // Pick an index that exists on the wheel (wheelMembers), and only among active/non-winner
+    const eligibleWheelIdx = wheelMembers
+      .map((m, i) => ({ m, i }))
+      .filter(({ m }) => m.status === "active" && !m.is_winner);
+    const chosen = eligibleWheelIdx[Math.floor(Math.random() * eligibleWheelIdx.length)];
+    const picked = chosen.m;
 
     await startRecording();
-    await wheelRef.current!.spinTo(pickIndexInMembers);
+    await wheelRef.current!.spinTo(chosen.i);
     await new Promise((r) => setTimeout(r, 1200));
     const url = await stopRecording();
     setVideoUrl(url);
 
-    const { error: e1 } = await supabase
-      .from("members")
-      .update({ is_winner: true, won_month: monthLabel, won_at: new Date().toISOString() })
-      .eq("id", picked.id);
+    // Server-side lock: unique index on winners.month_year prevents double-draws.
     const { error: e2 } = await supabase.from("winners").insert({
       member_id: picked.id,
       member_name: picked.name,
       month_year: monthKey,
     });
-    if (e1 || e2) toast.error((e1 || e2)!.message);
+    if (e2) {
+      toast.error("Draw already recorded for this month");
+      setSpinning(false);
+      load();
+      return;
+    }
+    const { error: e1 } = await supabase
+      .from("members")
+      .update({ is_winner: true, status: "used", won_month: monthLabel, won_at: new Date().toISOString() })
+      .eq("id", picked.id);
+    if (e1) toast.error(e1.message);
     setWinner(picked);
     setSpinning(false);
     load();
@@ -131,17 +149,35 @@ function Index() {
 
   const displayMembers = members.length ? members : placeholderMembers;
 
+  // Auto-open WhatsApp share once a winner is set (one-tap send).
+  useEffect(() => {
+    if (!winner || !settings) return;
+    const url = whatsappShareUrl(shareText, settings.whatsapp_group_link);
+    const t = setTimeout(() => window.open(url, "_blank", "noopener,noreferrer"), 900);
+    return () => clearTimeout(t);
+  }, [winner, settings, shareText]);
+
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-border/40 backdrop-blur bg-background/40 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary animate-shimmer" />
-            <span className="font-serif text-2xl text-gold">
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
+      <header className="border-b border-border/60 bg-card/60 backdrop-blur shrink-0">
+        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {settings?.logo_url ? (
+              <img src={settings.logo_url} alt="" className="h-8 w-8 rounded object-cover" />
+            ) : (
+              <Crown className="h-5 w-5 text-primary" />
+            )}
+            <span className="font-serif text-xl text-gold">
               {settings?.lottery_title ?? "Lucky Draw"}
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <Link to="/winners">
+              <Button variant="ghost" size="sm"><History className="h-4 w-4 mr-2" /> Hall of Winners</Button>
+            </Link>
+            <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
             {session ? (
               <Link to="/admin">
                 <Button variant="outline" size="sm">
@@ -157,72 +193,65 @@ function Index() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-8 grid lg:grid-cols-[320px_1fr_320px] gap-8">
-        <aside className="rounded-2xl border border-border/60 bg-card/70 backdrop-blur p-5 h-fit lg:sticky lg:top-24">
-          <h2 className="font-serif text-xl text-gold mb-1 flex items-center gap-2">
+      <div className="flex-1 min-h-0 max-w-7xl w-full mx-auto px-6 py-4 grid lg:grid-cols-[280px_1fr_280px] gap-6">
+        <aside className="rounded-2xl border border-border/60 bg-card/80 p-4 flex flex-col min-h-0">
+          <h2 className="font-serif text-lg text-gold mb-1 flex items-center gap-2 shrink-0">
             <Crown className="h-4 w-4" /> Members
           </h2>
-          <p className="text-xs text-muted-foreground mb-4">
+          <p className="text-xs text-muted-foreground mb-3 shrink-0">
             {members.length} total • {eligible.length} in the running
           </p>
-          <ol className="space-y-1.5">
-            {displayMembers.map((m) => (
-              <li
-                key={m.id}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 transition ${
-                  m.is_winner
-                    ? "bg-primary/10 border border-primary/30"
-                    : "bg-background/40 hover:bg-background/60"
-                }`}
-              >
-                <span className="text-xs w-6 text-muted-foreground">{m.position}</span>
-                <span className={`flex-1 text-sm ${m.is_winner ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                  {m.name}
-                </span>
-                {m.is_winner && <Trophy className="h-3.5 w-3.5 text-primary" />}
-              </li>
-            ))}
-            {members.length === 0 && (
-              <li className="text-xs text-muted-foreground pt-2">
-                Preview names. <Link to="/auth" className="text-primary underline">Sign in</Link> to add real members.
-              </li>
-            )}
+          <ol className="space-y-1.5 overflow-y-auto pr-2 flex-1 min-h-0">
+            {displayMembers.map((m) => {
+              const isUsed = m.is_winner || m.status === "used";
+              const isInactive = m.status === "inactive";
+              return (
+                <li
+                  key={m.id}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2 transition ${
+                    isUsed ? "bg-primary/10 border border-primary/30"
+                    : isInactive ? "bg-muted/40 opacity-60"
+                    : "bg-background/60 hover:bg-background"
+                  }`}
+                >
+                  <span className="text-xs w-6 text-muted-foreground">{m.position}</span>
+                  <span className={`flex-1 text-sm ${isUsed ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                    {m.name}
+                  </span>
+                  {isUsed && <Trophy className="h-3.5 w-3.5 text-primary" />}
+                  {isInactive && <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Inactive</span>}
+                </li>
+              );
+            })}
           </ol>
         </aside>
 
-        <main className="flex flex-col items-center">
-          <div className="text-center mb-6">
-            <p className="text-sm uppercase tracking-[0.3em] text-muted-foreground">{monthLabel}</p>
-            <h1 className="text-4xl md:text-5xl font-serif text-gold mt-2">Spin for {monthLabel}</h1>
+        <main className="flex flex-col items-center justify-start min-h-0 overflow-y-auto">
+          <SpinningWheel ref={wheelRef} members={wheelMembers} size={420} />
+
+          <div className="text-center mt-4">
+            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">{monthLabel}</p>
+            <h1 className="text-3xl md:text-4xl font-serif text-gold mt-1">Spin for {monthLabel}</h1>
             {settings && (
-              <p className="mt-3 text-muted-foreground">
+              <p className="mt-2 text-sm text-muted-foreground">
                 {alreadySpunThisMonth
                   ? "This month's winner has been drawn."
                   : dateOk
-                    ? isAdmin
-                      ? "The wheel is unlocked. Time to spin."
-                      : "The wheel unlocks only for the admin today."
-                    : `The wheel unlocks on the ${ordinal(settings.spin_day)} of each month.`}
+                    ? isAdmin ? "The wheel is unlocked." : "Only the admin can spin today."
+                    : `Unlocks on the ${ordinal(settings.spin_day)} of each month.`}
               </p>
             )}
           </div>
 
-          <SpinningWheel ref={wheelRef} members={displayMembers} />
-
-          <div className="mt-8 flex flex-col items-center gap-3">
+          <div className="mt-4 flex flex-col items-center gap-2 pb-4">
             <Button
               size="lg"
               onClick={handleSpin}
               disabled={!canSpin}
-              className="bg-gold text-primary-foreground font-serif text-lg px-10 h-14 rounded-full shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-50"
+              className="bg-gold text-primary-foreground font-serif text-base px-8 h-12 rounded-full shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-50"
             >
               {spinning ? "Spinning\u2026" : alreadySpunThisMonth ? "Already drawn" : !dateOk ? (<><Lock className="h-4 w-4 mr-2" /> Locked</>) : "Spin the Wheel"}
             </Button>
-            {!session && (
-              <p className="text-xs text-muted-foreground">
-                Only the admin can spin. <Link to="/auth" className="text-primary underline">Sign in</Link>
-              </p>
-            )}
           </div>
 
           {winner && settings && (
@@ -238,13 +267,13 @@ function Index() {
           )}
         </main>
 
-        <aside className="rounded-2xl border border-border/60 bg-card/70 backdrop-blur p-5 h-fit lg:sticky lg:top-24">
-          <h2 className="font-serif text-xl text-gold mb-4 flex items-center gap-2">
+        <aside className="rounded-2xl border border-border/60 bg-card/80 p-4 flex flex-col min-h-0">
+          <h2 className="font-serif text-lg text-gold mb-3 flex items-center gap-2 shrink-0">
             <Trophy className="h-4 w-4" /> Hall of Winners
           </h2>
-          <ul className="space-y-2">
+          <ul className="space-y-2 overflow-y-auto pr-2 flex-1 min-h-0">
             {winners.map((w) => (
-              <li key={w.id} className="rounded-lg bg-background/40 px-3 py-2">
+              <li key={w.id} className="rounded-lg bg-background/60 px-3 py-2">
                 <div className="text-sm font-semibold text-primary">{w.member_name}</div>
                 <div className="text-xs text-muted-foreground">{w.month_year}</div>
               </li>
@@ -253,6 +282,13 @@ function Index() {
           </ul>
         </aside>
       </div>
+
+      <footer className="border-t border-border/60 bg-card/60 backdrop-blur shrink-0">
+        <div className="max-w-7xl mx-auto px-6 h-10 flex items-center justify-center text-xs text-muted-foreground">
+          © {new Date().getFullYear()} • Developed with <span className="text-destructive mx-1">♥</span> by
+          <span className="ml-1 font-semibold text-foreground">Dexorzo Creations</span>
+        </div>
+      </footer>
     </div>
   );
 }
@@ -265,6 +301,7 @@ const placeholderMembers: Member[] = Array.from({ length: 20 }, (_, i) => ({
   is_winner: false,
   won_month: null,
   won_at: null,
+  status: "active",
 }));
 
 function ordinal(n: number) {
@@ -324,10 +361,10 @@ function WinnerCard({
   const waHref = whatsappShareUrl(shareText, groupLink);
 
   return (
-    <div className="mt-10 w-full max-w-2xl rounded-3xl border-2 border-primary/50 bg-gradient-to-br from-card to-background/50 p-8 shadow-[var(--shadow-glow)] animate-pop-in">
+    <div className="mt-6 w-full max-w-xl rounded-3xl border-2 border-primary/50 bg-gradient-to-br from-card to-background/50 p-6 shadow-[var(--shadow-glow)] animate-pop-in">
       <div className="text-center">
         <div className="text-sm uppercase tracking-[0.3em] text-primary">Winner of {monthLabel}</div>
-        <div className="mt-3 text-5xl md:text-6xl font-serif text-gold">\uD83C\uDF89 {winner.name} \uD83C\uDF89</div>
+        <div className="mt-3 text-4xl md:text-5xl font-serif text-gold">🎉 {winner.name} 🎉</div>
         {prize && <div className="mt-2 text-muted-foreground text-lg">Prize: {prize}</div>}
       </div>
       <div className="mt-6 grid sm:grid-cols-2 gap-3">

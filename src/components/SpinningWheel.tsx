@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "re
 import type { Member } from "@/lib/lottery";
 
 const PALETTE = [
-  "#7c3aed", "#c084fc", "#f59e0b", "#fbbf24", "#ec4899", "#f472b6",
-  "#10b981", "#34d399", "#3b82f6", "#60a5fa", "#ef4444", "#f87171",
-  "#8b5cf6", "#a78bfa", "#d97706", "#eab308", "#db2777", "#e879f9",
-  "#059669", "#22c55e",
+  "#b8894a", "#d4a76a", "#7a5c3a", "#a67856", "#c9a961", "#8f6f4f",
+  "#e0b877", "#9b7d5c", "#6b8e6b", "#a8b596", "#c48b5a", "#7d9b7d",
+  "#d9b482", "#8b6a48", "#b09174", "#c9a375", "#8a6f52", "#a58968",
+  "#bfa27a", "#96795a",
 ];
 
 export type WheelHandle = {

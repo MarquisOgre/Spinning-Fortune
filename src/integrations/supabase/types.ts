@@ -22,6 +22,7 @@ export type Database = {
           name: string
           phone: string | null
           position: number
+          status: string
           won_at: string | null
           won_month: string | null
         }
@@ -32,6 +33,7 @@ export type Database = {
           name: string
           phone?: string | null
           position: number
+          status?: string
           won_at?: string | null
           won_month?: string | null
         }
@@ -42,6 +44,7 @@ export type Database = {
           name?: string
           phone?: string | null
           position?: number
+          status?: string
           won_at?: string | null
           won_month?: string | null
         }
@@ -49,7 +52,9 @@ export type Database = {
       }
       settings: {
         Row: {
+          favicon_url: string | null
           id: number
+          logo_url: string | null
           lottery_title: string
           prize_amount: string | null
           spin_day: number
@@ -57,7 +62,9 @@ export type Database = {
           whatsapp_group_name: string | null
         }
         Insert: {
+          favicon_url?: string | null
           id?: number
+          logo_url?: string | null
           lottery_title?: string
           prize_amount?: string | null
           spin_day?: number
@@ -65,7 +72,9 @@ export type Database = {
           whatsapp_group_name?: string | null
         }
         Update: {
+          favicon_url?: string | null
           id?: number
+          logo_url?: string | null
           lottery_title?: string
           prize_amount?: string | null
           spin_day?: number
