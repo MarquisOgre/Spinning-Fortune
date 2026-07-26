@@ -20,7 +20,11 @@ export type Settings = {
   prize_amount: string | null;
   logo_url: string | null;
   favicon_url: string | null;
+  winning_popup_days: number;
+  font_family: FontFamily;
 };
+
+export type FontFamily = "modern" | "classic" | "elegant" | "clean";
 
 export type Winner = {
   id: string;
@@ -48,7 +52,18 @@ export async function fetchMembers(): Promise<Member[]> {
 export async function fetchSettings(): Promise<Settings> {
   const { data, error } = await supabase.from("settings").select("*").eq("id", 1).maybeSingle();
   if (error) throw error;
-  return (data ?? { id: 1, spin_day: 1, whatsapp_group_link: "", whatsapp_group_name: "Lottery Group", lottery_title: "Monthly Lucky Draw", prize_amount: "" }) as Settings;
+  return (data ?? {
+    id: 1,
+    spin_day: 1,
+    whatsapp_group_link: "",
+    whatsapp_group_name: "Lottery Group",
+    lottery_title: "Monthly Lucky Draw",
+    prize_amount: "",
+    logo_url: "",
+    favicon_url: "",
+    winning_popup_days: 3,
+    font_family: "modern",
+  }) as Settings;
 }
 
 export async function fetchWinners(): Promise<Winner[]> {

@@ -59,6 +59,8 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-whatsapp: var(--whatsapp);
+  --color-whatsapp-foreground: var(--whatsapp-foreground);
 }
 
 :root {
@@ -86,6 +88,8 @@
   --gold: oklch(0.62 0.11 65);
   --gold-bright: oklch(0.75 0.12 70);
   --gold-deep: oklch(0.48 0.09 55);
+  --whatsapp: oklch(0.69 0.18 149);
+  --whatsapp-foreground: oklch(0.99 0.01 145);
   --gradient-gold: linear-gradient(135deg, oklch(0.72 0.11 70), oklch(0.5 0.09 55));
   --gradient-spot: radial-gradient(ellipse at top, oklch(0.93 0.03 75) 0%, oklch(0.97 0.012 85) 55%);
   --shadow-glow: 0 0 40px -8px oklch(0.62 0.11 65 / 0.35);
@@ -129,6 +133,8 @@
   --gold: oklch(0.78 0.12 75);
   --gold-bright: oklch(0.88 0.13 78);
   --gold-deep: oklch(0.6 0.1 60);
+  --whatsapp: oklch(0.72 0.17 149);
+  --whatsapp-foreground: oklch(0.16 0.02 145);
   --gradient-gold: linear-gradient(135deg, oklch(0.88 0.13 78), oklch(0.6 0.1 60));
   --gradient-spot: radial-gradient(ellipse at top, oklch(0.28 0.03 55) 0%, oklch(0.17 0.015 55) 60%);
   --shadow-glow: 0 0 50px -10px oklch(0.78 0.12 75 / 0.4);
@@ -158,12 +164,65 @@
     color: var(--color-foreground);
     background-image: var(--gradient-spot);
     background-attachment: fixed;
-    font-family: 'Cormorant Garamond', 'Playfair Display', ui-serif, Georgia, serif;
+    font-family: 'Manrope', 'Inter', ui-sans-serif, system-ui, sans-serif;
   }
   h1, h2, h3, h4 {
-    font-family: 'Playfair Display', ui-serif, Georgia, serif;
-    letter-spacing: -0.01em;
+    font-family: 'Sora', 'Manrope', ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: 0;
   }
+}
+
+html[data-font="modern"] body,
+html[data-font="modern"] .font-serif {
+  font-family: 'Sora', 'Manrope', ui-sans-serif, system-ui, sans-serif;
+}
+
+html[data-font="clean"] body,
+html[data-font="clean"] .font-serif {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+html[data-font="classic"] body,
+html[data-font="classic"] .font-serif {
+  font-family: 'Lora', 'Playfair Display', ui-serif, Georgia, serif;
+}
+
+html[data-font="elegant"] body,
+html[data-font="elegant"] .font-serif {
+  font-family: 'Playfair Display', 'Cormorant Garamond', ui-serif, Georgia, serif;
+}
+
+html[data-font="modern"] h1,
+html[data-font="modern"] h2,
+html[data-font="modern"] h3,
+html[data-font="modern"] h4 {
+  font-family: 'Sora', 'Manrope', ui-sans-serif, system-ui, sans-serif;
+}
+
+html[data-font="clean"] h1,
+html[data-font="clean"] h2,
+html[data-font="clean"] h3,
+html[data-font="clean"] h4 {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+html[data-font="classic"] h1,
+html[data-font="classic"] h2,
+html[data-font="classic"] h3,
+html[data-font="classic"] h4 {
+  font-family: 'Playfair Display', 'Lora', ui-serif, Georgia, serif;
+}
+
+html[data-font="elegant"] h1,
+html[data-font="elegant"] h2,
+html[data-font="elegant"] h3,
+html[data-font="elegant"] h4 {
+  font-family: 'Playfair Display', 'Cormorant Garamond', ui-serif, Georgia, serif;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--primary) 55%, transparent) transparent;
 }
 
 @utility text-gold {

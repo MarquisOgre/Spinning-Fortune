@@ -96,7 +96,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Lora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&family=Sora:wght@500;600;700;800&display=swap",
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
@@ -134,18 +134,21 @@ function RootComponent() {
     return () => sub.subscription.unsubscribe();
   }, [router]);
 
-  // Apply dynamic favicon from settings, if configured.
+  // Apply dynamic favicon and font from settings, if configured.
   useEffect(() => {
-    supabase.from("settings").select("favicon_url").eq("id", 1).maybeSingle().then(({ data }) => {
+    supabase.from("settings").select("favicon_url,font_family").eq("id", 1).maybeSingle().then(({ data }) => {
       const url = (data as { favicon_url?: string } | null)?.favicon_url;
-      if (!url) return;
-      let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
-      if (!link) {
-        link = document.createElement("link");
-        link.rel = "icon";
-        document.head.appendChild(link);
+      const font = (data as { font_family?: string } | null)?.font_family;
+      if (font) document.documentElement.dataset.font = font;
+      if (url) {
+        let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+        if (!link) {
+          link = document.createElement("link");
+          link.rel = "icon";
+          document.head.appendChild(link);
+        }
+        link.href = url;
       }
-      link.href = url;
     });
   }, []);
 
