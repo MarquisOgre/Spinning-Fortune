@@ -2,8 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Crown, Lock, Share2, Download, Trophy, Settings as SettingsIcon, Sun, Moon, History } from "lucide-react";
+import { CalendarDays, Crown, Lock, Share2, Download, Trophy, Settings as SettingsIcon, Sun, Moon, History } from "lucide-react";
 import { SpinningWheel, type WheelHandle } from "@/components/SpinningWheel";
 import { useTheme } from "@/hooks/use-theme";
 import {
@@ -20,8 +27,30 @@ import {
 } from "@/lib/lottery";
 
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "Lucky Draw — Monthly Spinning Wheel" },
+      { name: "description", content: "Spin a beautiful monthly lottery wheel, announce the winner, and share draw proof to WhatsApp." },
+      { property: "og:title", content: "Lucky Draw — Monthly Spinning Wheel" },
+      { property: "og:description", content: "A 20-member monthly lucky draw with winner history and WhatsApp sharing." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: Index,
 });
+
+type WinnerPopupData = {
+  recordId: string;
+  memberName: string;
+  monthKey: string;
+  monthLabel: string;
+  prize?: string | null;
+  title: string;
+  videoUrl: string | null;
+  shareText: string;
+  groupLink?: string | null;
+};
 
 function Index() {
   const wheelRef = useRef<WheelHandle>(null);
@@ -34,6 +63,10 @@ function Index() {
   const [spinning, setSpinning] = useState(false);
   const [winner, setWinner] = useState<Member | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [winnerDialogOpen, setWinnerDialogOpen] = useState(false);
+  const [welcomeDialogOpen, setWelcomeDialogOpen] = useState(false);
+  const [welcomeShown, setWelcomeShown] = useState(false);
+  const [dismissedWinnerId, setDismissedWinnerId] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
 
@@ -66,6 +99,10 @@ function Index() {
   const monthKey = currentMonthKey();
   const monthLabel = currentMonthLabel();
   const alreadySpunThisMonth = winners.some((w) => w.month_year === monthKey);
+  const currentMonthWinner = useMemo(
+    () => winners.find((w) => w.month_year === monthKey) ?? null,
+    [winners, monthKey],
+  );
   const dateOk = settings ? isSpinAllowedToday(settings.spin_day) : false;
   const canSpin = isAdmin && !spinning && !alreadySpunThisMonth && dateOk && eligible.length > 0;
 
@@ -89,9 +126,10 @@ function Index() {
     new Promise<string | null>((resolve) => {
       const rec = recorderRef.current;
       if (!rec) return resolve(null);
-      rec.onstop = () => {
+      rec.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: "video/webm" });
-        resolve(URL.createObjectURL(blob));
+        if (blob.size === 0) return resolve(null);
+        resolve(await blobToDataUrl(blob));
       };
       rec.stop();
     });
@@ -101,6 +139,7 @@ function Index() {
     setSpinning(true);
     setWinner(null);
     setVideoUrl(null);
+    setWelcomeShown(false);
 
     // Pick an index that exists on the wheel (wheelMembers), and only among active/non-winner
     const eligibleWheelIdx = wheelMembers
@@ -110,7 +149,12 @@ function Index() {
     const picked = chosen.m;
 
     await startRecording();
-    await wheelRef.current!.spinTo(chosen.i);
+    const wheel = wheelRef.current;
+    if (!wheel) {
+      setSpinning(false);
+      return;
+    }
+    await wheel.spinTo(chosen.i);
     await new Promise((r) => setTimeout(r, 1200));
     const url = await stopRecording();
     setVideoUrl(url);
@@ -120,6 +164,7 @@ function Index() {
       member_id: picked.id,
       member_name: picked.name,
       month_year: monthKey,
+      video_url: url,
     });
     if (e2) {
       toast.error("Draw already recorded for this month");
@@ -133,6 +178,7 @@ function Index() {
       .eq("id", picked.id);
     if (e1) toast.error(e1.message);
     setWinner(picked);
+    setWinnerDialogOpen(true);
     setSpinning(false);
     load();
   };
@@ -149,13 +195,55 @@ function Index() {
 
   const displayMembers = members.length ? members : placeholderMembers;
 
-  // Auto-open WhatsApp share once a winner is set (one-tap send).
+  const persistentWinner = useMemo(() => {
+    if (!settings || !currentMonthWinner || settings.winning_popup_days <= 0) return null;
+    const spunAt = Date.parse(currentMonthWinner.spun_at);
+    if (Number.isNaN(spunAt)) return null;
+    const ageDays = (Date.now() - spunAt) / 86_400_000;
+    return ageDays <= settings.winning_popup_days ? currentMonthWinner : null;
+  }, [currentMonthWinner, settings]);
+
+  const winnerPopup = useMemo<WinnerPopupData | null>(() => {
+    if (!settings) return null;
+    if (winner) {
+      return {
+        recordId: `fresh-${winner.id}`,
+        memberName: winner.name,
+        monthKey,
+        monthLabel,
+        prize: settings.prize_amount,
+        title: settings.lottery_title,
+        videoUrl,
+        shareText,
+        groupLink: settings.whatsapp_group_link,
+      };
+    }
+    if (!persistentWinner) return null;
+    const persistentMonthLabel = monthLabelFromKey(persistentWinner.month_year);
+    return {
+      recordId: persistentWinner.id,
+      memberName: persistentWinner.member_name,
+      monthKey: persistentWinner.month_year,
+      monthLabel: persistentMonthLabel,
+      prize: settings.prize_amount,
+      title: settings.lottery_title,
+      videoUrl: persistentWinner.video_url,
+      shareText: buildWhatsappShareText({
+        title: settings.lottery_title,
+        winnerName: persistentWinner.member_name,
+        monthLabel: persistentMonthLabel,
+        prize: settings.prize_amount,
+      }),
+      groupLink: settings.whatsapp_group_link,
+    };
+  }, [monthKey, monthLabel, persistentWinner, settings, shareText, videoUrl, winner]);
+
   useEffect(() => {
-    if (!winner || !settings) return;
-    const url = whatsappShareUrl(shareText, settings.whatsapp_group_link);
-    const t = setTimeout(() => window.open(url, "_blank", "noopener,noreferrer"), 900);
-    return () => clearTimeout(t);
-  }, [winner, settings, shareText]);
+    if (!winnerPopup || winner || dismissedWinnerId === winnerPopup.recordId) return;
+    setWinnerDialogOpen(true);
+  }, [dismissedWinnerId, winner, winnerPopup]);
+
+  const nextDrawLabel = nextMonthLabel(monthKey);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background">
@@ -193,15 +281,15 @@ function Index() {
         </div>
       </header>
 
-      <div className="flex-1 min-h-0 max-w-7xl w-full mx-auto px-6 py-4 grid lg:grid-cols-[280px_1fr_280px] gap-6">
-        <aside className="rounded-2xl border border-border/60 bg-card/80 p-4 flex flex-col min-h-0">
+      <div className="flex-1 min-h-0 max-w-7xl w-full mx-auto px-6 py-4 grid lg:grid-cols-[300px_1fr_300px] gap-6 overflow-hidden">
+        <aside className="h-full rounded-2xl border border-border/60 bg-card/80 p-4 flex flex-col min-h-0">
           <h2 className="font-serif text-lg text-gold mb-1 flex items-center gap-2 shrink-0">
             <Crown className="h-4 w-4" /> Members
           </h2>
           <p className="text-xs text-muted-foreground mb-3 shrink-0">
             {members.length} total • {eligible.length} in the running
           </p>
-          <ol className="space-y-1.5 overflow-y-auto pr-2 flex-1 min-h-0">
+          <ol className="space-y-2 overflow-y-auto pr-2 flex-1 min-h-0">
             {displayMembers.map((m) => {
               const isUsed = m.is_winner || m.status === "used";
               const isInactive = m.status === "inactive";
@@ -211,7 +299,7 @@ function Index() {
                   className={`flex items-center gap-3 rounded-lg px-3 py-2 transition ${
                     isUsed ? "bg-primary/10 border border-primary/30"
                     : isInactive ? "bg-muted/40 opacity-60"
-                    : "bg-background/60 hover:bg-background"
+                    : "bg-background/70 hover:bg-background"
                   }`}
                 >
                   <span className="text-xs w-6 text-muted-foreground">{m.position}</span>
@@ -226,7 +314,7 @@ function Index() {
           </ol>
         </aside>
 
-        <main className="flex flex-col items-center justify-start min-h-0 overflow-y-auto">
+        <main className="flex flex-col items-center justify-center min-h-0 overflow-hidden">
           <SpinningWheel ref={wheelRef} members={wheelMembers} size={420} />
 
           <div className="mt-4 flex flex-col md:flex-row items-center justify-center gap-4">
@@ -267,20 +355,9 @@ function Index() {
   </p>
 )}
 
-          {winner && settings && (
-            <WinnerCard
-              winner={winner}
-              monthLabel={monthLabel}
-              prize={settings.prize_amount}
-              title={settings.lottery_title}
-              videoUrl={videoUrl}
-              shareText={shareText}
-              groupLink={settings.whatsapp_group_link}
-            />
-          )}
         </main>
 
-        <aside className="rounded-2xl border border-border/60 bg-card/80 p-4 flex flex-col min-h-0">
+        <aside className="h-full rounded-2xl border border-border/60 bg-card/80 p-4 flex flex-col min-h-0">
           <h2 className="font-serif text-lg text-gold mb-3 flex items-center gap-2 shrink-0">
             <Trophy className="h-4 w-4" /> Hall of Winners
           </h2>
@@ -302,6 +379,36 @@ function Index() {
           <span className="ml-1 font-semibold text-foreground">Dexorzo Creations</span>
         </div>
       </footer>
+
+      <WinnerDialog
+        open={winnerDialogOpen}
+        winner={winnerPopup}
+        onOpenChange={(open) => {
+          setWinnerDialogOpen(open);
+          if (!open && winnerPopup) setDismissedWinnerId(winnerPopup.recordId);
+          if (!open && winner && !welcomeShown) {
+            setWelcomeShown(true);
+            setWelcomeDialogOpen(true);
+          }
+        }}
+      />
+
+      <Dialog open={welcomeDialogOpen} onOpenChange={setWelcomeDialogOpen}>
+        <DialogContent className="max-w-md rounded-3xl border-primary/40 bg-card p-8 text-center shadow-[var(--shadow-card)]">
+          <DialogHeader className="items-center text-center">
+            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <CalendarDays className="h-7 w-7" />
+            </div>
+            <DialogTitle className="text-2xl text-gold">Next Month Draw</DialogTitle>
+            <DialogDescription className="text-base text-muted-foreground">
+              Welcome to the {nextDrawLabel} draw. The wheel will unlock on the configured spin date.
+            </DialogDescription>
+          </DialogHeader>
+          <Button onClick={() => setWelcomeDialogOpen(false)} className="mt-2 rounded-full bg-gold px-8 text-primary-foreground">
+            Got it
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -323,20 +430,44 @@ function ordinal(n: number) {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-function WinnerCard({
-  winner, monthLabel, prize, title, videoUrl, shareText, groupLink,
+function monthLabelFromKey(key: string) {
+  const [year, month] = key.split("-");
+  return new Date(Number(year), Number(month) - 1, 1).toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function nextMonthLabel(key: string) {
+  const [year, month] = key.split("-");
+  return new Date(Number(year), Number(month), 1).toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+function WinnerDialog({
+  open,
+  winner,
+  onOpenChange,
 }: {
-  winner: Member;
-  monthLabel: string;
-  prize?: string | null;
-  title: string;
-  videoUrl: string | null;
-  shareText: string;
-  groupLink?: string | null;
+  open: boolean;
+  winner: WinnerPopupData | null;
+  onOpenChange: (open: boolean) => void;
 }) {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!winner) return;
     const c = document.createElement("canvas");
     c.width = 1200;
     c.height = 630;
@@ -350,51 +481,72 @@ function WinnerCard({
     ctx.fillStyle = "#f5c34a";
     ctx.font = "600 32px serif";
     ctx.textAlign = "center";
-    ctx.fillText(title.toUpperCase(), 600, 120);
+    ctx.fillText(winner.title.toUpperCase(), 600, 120);
     ctx.font = "italic 28px serif";
     ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.fillText(monthLabel, 600, 170);
+    ctx.fillText(winner.monthLabel, 600, 170);
     ctx.fillStyle = "#fff";
     ctx.font = "600 48px sans-serif";
     ctx.fillText("\uD83C\uDFC6 WINNER \uD83C\uDFC6", 600, 280);
     ctx.fillStyle = "#f5c34a";
     ctx.font = "700 84px serif";
-    ctx.fillText(winner.name, 600, 400);
-    if (prize) {
+    ctx.fillText(winner.memberName, 600, 400);
+    if (winner.prize) {
       ctx.fillStyle = "rgba(255,255,255,0.8)";
       ctx.font = "500 36px sans-serif";
-      ctx.fillText(`Prize: ${prize}`, 600, 470);
+      ctx.fillText(`Prize: ${winner.prize}`, 600, 470);
     }
     ctx.fillStyle = "rgba(255,255,255,0.5)";
     ctx.font = "500 22px sans-serif";
     ctx.fillText("Congratulations!", 600, 560);
     c.toBlob((b) => b && setImgUrl(URL.createObjectURL(b)), "image/png");
-  }, [winner, monthLabel, prize, title]);
+  }, [winner]);
 
-  const waHref = whatsappShareUrl(shareText, groupLink);
+  if (!winner) return null;
+
+  const waHref = whatsappShareUrl(winner.shareText, winner.groupLink);
 
   return (
-    <div className="mt-6 w-full max-w-xl rounded-3xl border-2 border-primary/50 bg-gradient-to-br from-card to-background/50 p-6 shadow-[var(--shadow-glow)] animate-pop-in">
-      <div className="text-center">
-        <div className="text-sm uppercase tracking-[0.3em] text-primary">Winner of {monthLabel}</div>
-        <div className="mt-3 text-4xl md:text-5xl font-serif text-gold">🎉 {winner.name} 🎉</div>
-        {prize && <div className="mt-2 text-muted-foreground text-lg">Prize: {prize}</div>}
-      </div>
-      <div className="mt-6 grid sm:grid-cols-2 gap-3">
-        <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-full bg-[#25D366] text-white h-12 font-semibold hover:brightness-110">
-          <Share2 className="h-4 w-4" /> Share to WhatsApp
-        </a>
-        {imgUrl && (
-          <a href={imgUrl} download={`winner-${monthLabel}.png`} className="flex items-center justify-center gap-2 rounded-full bg-secondary text-secondary-foreground h-12 font-semibold hover:brightness-110">
-            <Download className="h-4 w-4" /> Download image
-          </a>
-        )}
-        {videoUrl && (
-          <a href={videoUrl} download={`spin-${monthLabel}.webm`} className="sm:col-span-2 flex items-center justify-center gap-2 rounded-full bg-primary/20 border border-primary/40 text-primary h-12 font-semibold hover:bg-primary/30">
-            <Download className="h-4 w-4" /> Download spin video
-          </a>
-        )}
-      </div>
-    </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl rounded-3xl border-2 border-primary/40 bg-card p-8 shadow-[var(--shadow-glow)] animate-pop-in">
+        <DialogHeader className="items-center text-center">
+          <DialogTitle className="text-sm uppercase tracking-[0.35em] text-primary">
+            Winner of the Month
+          </DialogTitle>
+          <DialogDescription className="text-sm uppercase tracking-[0.25em] text-muted-foreground">
+            {winner.monthLabel}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="text-center">
+          <div className="mt-2 text-4xl md:text-6xl font-serif text-gold">🎉 {winner.memberName} 🎉</div>
+          {winner.prize && <div className="mt-3 text-muted-foreground text-lg">Prize: {winner.prize}</div>}
+        </div>
+        <div className="mt-6 grid sm:grid-cols-2 gap-3">
+          <Button asChild className="h-12 rounded-full bg-whatsapp text-whatsapp-foreground font-semibold hover:brightness-110">
+            <a href={waHref} target="_blank" rel="noopener noreferrer">
+              <Share2 className="h-4 w-4" /> Share to WhatsApp
+            </a>
+          </Button>
+          {imgUrl && (
+            <Button asChild variant="secondary" className="h-12 rounded-full font-semibold">
+              <a href={imgUrl} download={`winner-${winner.monthKey}.png`}>
+                <Download className="h-4 w-4" /> Download image
+              </a>
+            </Button>
+          )}
+          {winner.videoUrl ? (
+            <Button asChild variant="outline" className="h-12 rounded-full border-primary/40 bg-primary/10 text-primary sm:col-span-2 font-semibold hover:bg-primary/20">
+              <a href={winner.videoUrl} download={`spin-${winner.monthKey}.webm`}>
+                <Download className="h-4 w-4" /> Download spin video
+              </a>
+            </Button>
+          ) : (
+            <Button variant="outline" disabled className="h-12 rounded-full sm:col-span-2 font-semibold">
+              <Download className="h-4 w-4" /> Spin video unavailable
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

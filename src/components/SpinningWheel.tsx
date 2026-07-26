@@ -106,10 +106,12 @@ export const SpinningWheel = forwardRef<WheelHandle, Props>(function SpinningWhe
         if (n === 0) return resolve();
         const step = (Math.PI * 2) / n;
         const targetSlice = -Math.PI / 2 - (index * step + step / 2);
-        const spins = 6 + Math.random() * 2;
-        const finalRot = targetSlice - Math.PI * 2 * spins;
+        const fullTurns = 6 + Math.floor(Math.random() * 3);
         const start = rotRef.current;
-        const delta = ((finalRot - start) % (Math.PI * 2)) - Math.PI * 2 * spins;
+        const tau = Math.PI * 2;
+        const normalize = (angle: number) => ((angle % tau) + tau) % tau;
+        const deltaToTarget = normalize(normalize(targetSlice) - normalize(start));
+        const delta = fullTurns * tau + deltaToTarget;
         const duration = 6500;
         const t0 = performance.now();
         const tick = (t: number) => {
@@ -128,7 +130,7 @@ export const SpinningWheel = forwardRef<WheelHandle, Props>(function SpinningWhe
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
-      <canvas ref={canvasRef} className="drop-shadow-[0_0_40px_rgba(245,197,66,0.35)]" />
+      <canvas ref={canvasRef} className="drop-shadow-[0_0_40px_color-mix(in_oklab,var(--gold)_35%,transparent)]" />
       <div
         className="absolute left-1/2 -translate-x-1/2 -top-2 z-10"
         style={{

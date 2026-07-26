@@ -53,6 +53,7 @@ export type Database = {
       settings: {
         Row: {
           favicon_url: string | null
+          font_family: string
           id: number
           logo_url: string | null
           lottery_title: string
@@ -60,9 +61,11 @@ export type Database = {
           spin_day: number
           whatsapp_group_link: string | null
           whatsapp_group_name: string | null
+          winning_popup_days: number
         }
         Insert: {
           favicon_url?: string | null
+          font_family?: string
           id?: number
           logo_url?: string | null
           lottery_title?: string
@@ -70,9 +73,11 @@ export type Database = {
           spin_day?: number
           whatsapp_group_link?: string | null
           whatsapp_group_name?: string | null
+          winning_popup_days?: number
         }
         Update: {
           favicon_url?: string | null
+          font_family?: string
           id?: number
           logo_url?: string | null
           lottery_title?: string
@@ -80,6 +85,7 @@ export type Database = {
           spin_day?: number
           whatsapp_group_link?: string | null
           whatsapp_group_name?: string | null
+          winning_popup_days?: number
         }
         Relationships: []
       }

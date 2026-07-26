@@ -122,7 +122,7 @@ function WinnerTile({ winner, settings }: { winner: Winner; settings: Awaited<Re
       <div className="mt-1 text-2xl font-serif text-gold">{winner.member_name}</div>
       <div className="mt-4 flex flex-wrap gap-2">
         <a href={waHref} target="_blank" rel="noopener noreferrer"
-           className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366] text-white text-xs px-3 py-1.5 font-semibold hover:brightness-110">
+           className="inline-flex items-center gap-1.5 rounded-full bg-whatsapp text-whatsapp-foreground text-xs px-3 py-1.5 font-semibold hover:brightness-110">
           <Share2 className="h-3.5 w-3.5" /> WhatsApp
         </a>
         {imgUrl && (
