@@ -283,9 +283,18 @@ function Index() {
   }, [monthKey, monthLabel, persistentWinner, settings, shareText, videoUrl, winner]);
 
   useEffect(() => {
-    if (!winnerPopup || winner || dismissedWinnerId === winnerPopup.recordId) return;
-    setWinnerDialogOpen(true);
-  }, [dismissedWinnerId, winner, winnerPopup]);
+    if (!winnerPopup || winner || welcomeShown || dismissedWinnerId === winnerPopup.recordId) return;
+    setWelcomeDialogOpen(true);
+  }, [dismissedWinnerId, welcomeShown, winner, winnerPopup]);
+
+  // Keep the wheel parked on the most recent winner until the next spin.
+  useEffect(() => {
+    if (spinning || !currentMonthWinner || !wheelMembers.length) return;
+    const idx = wheelMembers.findIndex(
+      (m) => m.id === currentMonthWinner.member_id || m.name === currentMonthWinner.member_name,
+    );
+    if (idx >= 0) wheelRef.current?.settleTo(idx);
+  }, [currentMonthWinner, spinning, wheelMembers]);
 
   const nextDrawLabel = nextMonthLabel(monthKey);
 
@@ -430,26 +439,38 @@ function Index() {
         onOpenChange={(open) => {
           setWinnerDialogOpen(open);
           if (!open && winnerPopup) setDismissedWinnerId(winnerPopup.recordId);
-          if (!open && winner && !welcomeShown) {
-            setWelcomeShown(true);
-            setWelcomeDialogOpen(true);
-          }
         }}
       />
 
-      <Dialog open={welcomeDialogOpen} onOpenChange={setWelcomeDialogOpen}>
+      <Dialog
+        open={welcomeDialogOpen}
+        onOpenChange={(open) => {
+          setWelcomeDialogOpen(open);
+          if (!open) {
+            setWelcomeShown(true);
+            if (winnerPopup) setWinnerDialogOpen(true);
+          }
+        }}
+      >
         <DialogContent className="max-w-md rounded-3xl border-primary/40 bg-card p-8 text-center shadow-[var(--shadow-card)]">
           <DialogHeader className="items-center text-center">
             <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
               <CalendarDays className="h-7 w-7" />
             </div>
-            <DialogTitle className="text-2xl text-gold">Next Month Draw</DialogTitle>
+            <DialogTitle className="text-2xl text-gold">Welcome to {settings?.lottery_title ?? "the Lucky Draw"}</DialogTitle>
             <DialogDescription className="text-base text-muted-foreground">
-              Welcome to the {nextDrawLabel} draw. The wheel will unlock on the configured spin date.
+              The {monthLabel} draw is complete. Next up: the {nextDrawLabel} draw, unlocking on the configured spin date.
             </DialogDescription>
           </DialogHeader>
-          <Button onClick={() => setWelcomeDialogOpen(false)} className="mt-2 rounded-full bg-gold px-8 text-primary-foreground">
-            Got it
+          <Button
+            onClick={() => {
+              setWelcomeDialogOpen(false);
+              setWelcomeShown(true);
+              if (winnerPopup) setWinnerDialogOpen(true);
+            }}
+            className="mt-2 rounded-full bg-gold px-8 text-primary-foreground"
+          >
+            See the winner
           </Button>
         </DialogContent>
       </Dialog>
