@@ -13,6 +13,7 @@ export type CardData = {
   monthLabel: string;
   memberName?: string;
   prize?: string | null;
+  monthNumberLabel?: string | null;
 };
 
 function bg(ctx: CanvasRenderingContext2D, w: number, h: number) {
@@ -36,6 +37,11 @@ export function drawWinnerCard(ctx: CanvasRenderingContext2D, w: number, h: numb
   ctx.fillStyle = CREAM.sub;
   ctx.font = `italic ${28 * s}px serif`;
   ctx.fillText(d.monthLabel, w / 2, 170 * s);
+  if (d.monthNumberLabel) {
+    ctx.fillStyle = CREAM.soft;
+    ctx.font = `500 ${22 * s}px sans-serif`;
+    ctx.fillText(d.monthNumberLabel, w / 2, 208 * s);
+  }
   ctx.fillStyle = CREAM.strong;
   ctx.font = `600 ${44 * s}px sans-serif`;
   ctx.fillText("\uD83C\uDFC6 WINNER OF THE MONTH \uD83C\uDFC6", w / 2, 280 * s);
@@ -65,9 +71,14 @@ export function drawWelcomeCard(ctx: CanvasRenderingContext2D, w: number, h: num
   ctx.fillStyle = CREAM.title;
   ctx.font = `italic ${36 * s}px serif`;
   ctx.fillText(d.monthLabel, w / 2, 380 * s);
+  if (d.monthNumberLabel) {
+    ctx.fillStyle = CREAM.gold;
+    ctx.font = `600 ${26 * s}px sans-serif`;
+    ctx.fillText(d.monthNumberLabel, w / 2, 420 * s);
+  }
   ctx.fillStyle = CREAM.soft;
   ctx.font = `500 ${24 * s}px sans-serif`;
-  ctx.fillText("The lucky draw is about to begin…", w / 2, 460 * s);
+  ctx.fillText("The lucky draw is about to begin…", w / 2, 470 * s);
 }
 
 export function renderWinnerImage(d: CardData): Promise<string | null> {
@@ -80,6 +91,17 @@ export function renderWinnerImage(d: CardData): Promise<string | null> {
     drawWinnerCard(ctx, 1200, 630, d);
     c.toBlob((b) => resolve(b ? URL.createObjectURL(b) : null), "image/png");
   });
+}
+
+/** Same card, but as a data URL so it can be persisted with the winner record. */
+export function renderWinnerImageDataUrl(d: CardData): string | null {
+  const c = document.createElement("canvas");
+  c.width = 1200;
+  c.height = 630;
+  const ctx = c.getContext("2d");
+  if (!ctx) return null;
+  drawWinnerCard(ctx, 1200, 630, d);
+  return c.toDataURL("image/png");
 }
 
 async function urlToFile(url: string, name: string, type: string) {
@@ -108,7 +130,7 @@ export async function shareWinner(opts: {
   videoUrl?: string | null;
   waHref: string;
   monthKey: string;
-}): Promise<"shared" | "fallback"> {
+}): Promise<"shared" | "fallback" | "failed"> {
   const files: File[] = [];
   try {
     if (opts.imageUrl) files.push(await urlToFile(opts.imageUrl, `winner-${opts.monthKey}.png`, "image/png"));
@@ -132,8 +154,20 @@ export async function shareWinner(opts: {
   } catch {
     /* ignore */
   }
-  if (opts.imageUrl) triggerDownload(opts.imageUrl, `winner-${opts.monthKey}.png`);
-  if (opts.videoUrl) triggerDownload(opts.videoUrl, `spin-${opts.monthKey}.webm`);
-  window.open(opts.waHref, "_blank", "noopener,noreferrer");
+  let delivered = 0;
+  try {
+    if (opts.imageUrl) {
+      triggerDownload(opts.imageUrl, `winner-${opts.monthKey}.png`);
+      delivered++;
+    }
+    if (opts.videoUrl) {
+      triggerDownload(opts.videoUrl, `spin-${opts.monthKey}.webm`);
+      delivered++;
+    }
+  } catch {
+    /* download blocked */
+  }
+  const win = window.open(opts.waHref, "_blank", "noopener,noreferrer");
+  if (!win || (delivered === 0 && (opts.imageUrl || opts.videoUrl))) return "failed";
   return "fallback";
 }
