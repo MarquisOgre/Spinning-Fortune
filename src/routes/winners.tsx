@@ -4,6 +4,7 @@ import { ArrowLeft, Download, Share2, Trophy, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fetchSettings, fetchWinners, buildWhatsappShareText, whatsappShareUrl, type Winner } from "@/lib/lottery";
 import { useTheme } from "@/hooks/use-theme";
+import { renderWinnerImage } from "@/lib/winner-card";
 
 export const Route = createFileRoute("/winners")({
   head: () => ({
@@ -90,26 +91,15 @@ function WinnerTile({ winner, settings }: { winner: Winner; settings: Awaited<Re
   }, [winner.month_year]);
 
   useEffect(() => {
-    const c = document.createElement("canvas");
-    c.width = 1200; c.height = 630;
-    const ctx = c.getContext("2d");
-    if (!ctx) return;
-    const g = ctx.createLinearGradient(0, 0, 1200, 630);
-    g.addColorStop(0, "#faf6ef"); g.addColorStop(1, "#e8dcc4");
-    ctx.fillStyle = g; ctx.fillRect(0, 0, 1200, 630);
-    ctx.fillStyle = "#7a5c3a";
-    ctx.font = "600 32px serif"; ctx.textAlign = "center";
-    ctx.fillText((settings?.lottery_title ?? "Lucky Draw").toUpperCase(), 600, 120);
-    ctx.fillStyle = "#8a7255"; ctx.font = "italic 28px serif";
-    ctx.fillText(monthLabel, 600, 170);
-    ctx.fillStyle = "#2d2a26"; ctx.font = "600 44px sans-serif";
-    ctx.fillText("🏆 WINNER 🏆", 600, 280);
-    ctx.fillStyle = "#b8894a"; ctx.font = "700 84px serif";
-    ctx.fillText(winner.member_name, 600, 400);
-    ctx.fillStyle = "#5b4b36"; ctx.font = "500 22px sans-serif";
-    ctx.fillText("Congratulations!", 600, 500);
-    c.toBlob((b) => b && setImgUrl(URL.createObjectURL(b)), "image/png");
-  }, [winner, monthLabel, settings?.lottery_title]);
+    let active = true;
+    renderWinnerImage({
+      title: settings?.lottery_title ?? "Lucky Draw",
+      monthLabel,
+      memberName: winner.member_name,
+      prize: settings?.prize_amount,
+    }).then((url) => active && setImgUrl(url));
+    return () => { active = false; };
+  }, [winner, monthLabel, settings?.lottery_title, settings?.prize_amount]);
 
   const shareText = settings
     ? buildWhatsappShareText({ title: settings.lottery_title, winnerName: winner.member_name, monthLabel, prize: settings.prize_amount })

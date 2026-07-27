@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { CalendarDays, Crown, Lock, Share2, Download, Trophy, Settings as SettingsIcon, Sun, Moon, History } from "lucide-react";
 import { SpinningWheel, type WheelHandle } from "@/components/SpinningWheel";
 import { useTheme } from "@/hooks/use-theme";
+import { drawWelcomeCard, drawWinnerCard, renderWinnerImage, shareWinner, CREAM } from "@/lib/winner-card";
 import {
   fetchMembers,
   fetchSettings,
@@ -69,6 +70,9 @@ function Index() {
   const [dismissedWinnerId, setDismissedWinnerId] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
+  const composeRef = useRef<HTMLCanvasElement | null>(null);
+  const phaseRef = useRef<{ kind: "welcome" | "wheel" | "winner"; data: any }>({ kind: "welcome", data: null });
+  const rafRef = useRef<number | null>(null);
 
   const load = async () => {
     const [m, s, w] = await Promise.all([fetchMembers(), fetchSettings(), fetchWinners()]);
@@ -106,12 +110,38 @@ function Index() {
   const dateOk = settings ? isSpinAllowedToday(settings.spin_day) : false;
   const canSpin = isAdmin && !spinning && !alreadySpunThisMonth && dateOk && eligible.length > 0;
 
+  // Records a composed canvas: welcome banner → live wheel spin → winner card.
   const startRecording = async () => {
-    const canvas = wheelRef.current?.canvas;
-    if (!canvas || typeof (canvas as HTMLCanvasElement).captureStream !== "function") return null;
     try {
-      const stream = (canvas as HTMLCanvasElement).captureStream(30);
-      const rec = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp9" });
+      const c = document.createElement("canvas");
+      c.width = 1200;
+      c.height = 630;
+      composeRef.current = c;
+      const ctx = c.getContext("2d");
+      if (!ctx || typeof c.captureStream !== "function") return null;
+
+      const frame = () => {
+        const phase = phaseRef.current;
+        if (phase.kind === "welcome") drawWelcomeCard(ctx, 1200, 630, phase.data);
+        else if (phase.kind === "winner") drawWinnerCard(ctx, 1200, 630, phase.data);
+        else {
+          const g = ctx.createLinearGradient(0, 0, 1200, 630);
+          g.addColorStop(0, CREAM.bgFrom);
+          g.addColorStop(1, CREAM.bgTo);
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, 1200, 630);
+          const wc = wheelRef.current?.canvas;
+          if (wc) {
+            const size = 570;
+            ctx.drawImage(wc, 600 - size / 2, 315 - size / 2, size, size);
+          }
+        }
+        rafRef.current = requestAnimationFrame(frame);
+      };
+      frame();
+
+      const stream = c.captureStream(30);
+      const rec = new MediaRecorder(stream, { mimeType: "video/webm" });
       chunksRef.current = [];
       rec.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
       rec.start();
@@ -125,6 +155,8 @@ function Index() {
   const stopRecording = () =>
     new Promise<string | null>((resolve) => {
       const rec = recorderRef.current;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
       if (!rec) return resolve(null);
       rec.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: "video/webm" });
@@ -148,14 +180,25 @@ function Index() {
     const chosen = eligibleWheelIdx[Math.floor(Math.random() * eligibleWheelIdx.length)];
     const picked = chosen.m;
 
+    const cardBase = {
+      title: settings.lottery_title,
+      monthLabel,
+      memberName: picked.name,
+      prize: settings.prize_amount,
+    };
+    phaseRef.current = { kind: "welcome", data: { ...cardBase, memberName: undefined } };
     await startRecording();
+    await new Promise((r) => setTimeout(r, 2200));
+    phaseRef.current = { kind: "wheel", data: null };
     const wheel = wheelRef.current;
     if (!wheel) {
       setSpinning(false);
       return;
     }
     await wheel.spinTo(chosen.i);
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, 900));
+    phaseRef.current = { kind: "winner", data: cardBase };
+    await new Promise((r) => setTimeout(r, 3000));
     const url = await stopRecording();
     setVideoUrl(url);
 
@@ -178,7 +221,8 @@ function Index() {
       .eq("id", picked.id);
     if (e1) toast.error(e1.message);
     setWinner(picked);
-    setWinnerDialogOpen(true);
+    setWelcomeShown(false);
+    setWelcomeDialogOpen(true);
     setSpinning(false);
     load();
   };
@@ -239,9 +283,18 @@ function Index() {
   }, [monthKey, monthLabel, persistentWinner, settings, shareText, videoUrl, winner]);
 
   useEffect(() => {
-    if (!winnerPopup || winner || dismissedWinnerId === winnerPopup.recordId) return;
-    setWinnerDialogOpen(true);
-  }, [dismissedWinnerId, winner, winnerPopup]);
+    if (!winnerPopup || winner || welcomeShown || dismissedWinnerId === winnerPopup.recordId) return;
+    setWelcomeDialogOpen(true);
+  }, [dismissedWinnerId, welcomeShown, winner, winnerPopup]);
+
+  // Keep the wheel parked on the most recent winner until the next spin.
+  useEffect(() => {
+    if (spinning || !currentMonthWinner || !wheelMembers.length) return;
+    const idx = wheelMembers.findIndex(
+      (m) => m.id === currentMonthWinner.member_id || m.name === currentMonthWinner.member_name,
+    );
+    if (idx >= 0) wheelRef.current?.settleTo(idx);
+  }, [currentMonthWinner, spinning, wheelMembers]);
 
   const nextDrawLabel = nextMonthLabel(monthKey);
 
@@ -386,26 +439,38 @@ function Index() {
         onOpenChange={(open) => {
           setWinnerDialogOpen(open);
           if (!open && winnerPopup) setDismissedWinnerId(winnerPopup.recordId);
-          if (!open && winner && !welcomeShown) {
-            setWelcomeShown(true);
-            setWelcomeDialogOpen(true);
-          }
         }}
       />
 
-      <Dialog open={welcomeDialogOpen} onOpenChange={setWelcomeDialogOpen}>
+      <Dialog
+        open={welcomeDialogOpen}
+        onOpenChange={(open) => {
+          setWelcomeDialogOpen(open);
+          if (!open) {
+            setWelcomeShown(true);
+            if (winnerPopup) setWinnerDialogOpen(true);
+          }
+        }}
+      >
         <DialogContent className="max-w-md rounded-3xl border-primary/40 bg-card p-8 text-center shadow-[var(--shadow-card)]">
           <DialogHeader className="items-center text-center">
             <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
               <CalendarDays className="h-7 w-7" />
             </div>
-            <DialogTitle className="text-2xl text-gold">Next Month Draw</DialogTitle>
+            <DialogTitle className="text-2xl text-gold">Welcome to {settings?.lottery_title ?? "the Lucky Draw"}</DialogTitle>
             <DialogDescription className="text-base text-muted-foreground">
-              Welcome to the {nextDrawLabel} draw. The wheel will unlock on the configured spin date.
+              The {monthLabel} draw is complete. Next up: the {nextDrawLabel} draw, unlocking on the configured spin date.
             </DialogDescription>
           </DialogHeader>
-          <Button onClick={() => setWelcomeDialogOpen(false)} className="mt-2 rounded-full bg-gold px-8 text-primary-foreground">
-            Got it
+          <Button
+            onClick={() => {
+              setWelcomeDialogOpen(false);
+              setWelcomeShown(true);
+              if (winnerPopup) setWinnerDialogOpen(true);
+            }}
+            className="mt-2 rounded-full bg-gold px-8 text-primary-foreground"
+          >
+            See the winner
           </Button>
         </DialogContent>
       </Dialog>
@@ -468,43 +533,34 @@ function WinnerDialog({
 
   useEffect(() => {
     if (!winner) return;
-    const c = document.createElement("canvas");
-    c.width = 1200;
-    c.height = 630;
-    const ctx = c.getContext("2d");
-    if (!ctx) return;
-    const g = ctx.createLinearGradient(0, 0, 1200, 630);
-    g.addColorStop(0, "#1a0f2e");
-    g.addColorStop(1, "#3b1e5e");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 1200, 630);
-    ctx.fillStyle = "#f5c34a";
-    ctx.font = "600 32px serif";
-    ctx.textAlign = "center";
-    ctx.fillText(winner.title.toUpperCase(), 600, 120);
-    ctx.font = "italic 28px serif";
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.fillText(winner.monthLabel, 600, 170);
-    ctx.fillStyle = "#fff";
-    ctx.font = "600 48px sans-serif";
-    ctx.fillText("\uD83C\uDFC6 WINNER \uD83C\uDFC6", 600, 280);
-    ctx.fillStyle = "#f5c34a";
-    ctx.font = "700 84px serif";
-    ctx.fillText(winner.memberName, 600, 400);
-    if (winner.prize) {
-      ctx.fillStyle = "rgba(255,255,255,0.8)";
-      ctx.font = "500 36px sans-serif";
-      ctx.fillText(`Prize: ${winner.prize}`, 600, 470);
-    }
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.font = "500 22px sans-serif";
-    ctx.fillText("Congratulations!", 600, 560);
-    c.toBlob((b) => b && setImgUrl(URL.createObjectURL(b)), "image/png");
+    let active = true;
+    renderWinnerImage({
+      title: winner.title,
+      monthLabel: winner.monthLabel,
+      memberName: winner.memberName,
+      prize: winner.prize,
+    }).then((url) => active && setImgUrl(url));
+    return () => {
+      active = false;
+    };
   }, [winner]);
 
   if (!winner) return null;
 
   const waHref = whatsappShareUrl(winner.shareText, winner.groupLink);
+
+  const handleShare = async () => {
+    const result = await shareWinner({
+      text: winner.shareText,
+      imageUrl: imgUrl,
+      videoUrl: winner.videoUrl,
+      waHref,
+      monthKey: winner.monthKey,
+    });
+    if (result === "fallback") {
+      toast.info("Winner image & video downloaded — attach them in WhatsApp (message text copied).");
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -522,10 +578,8 @@ function WinnerDialog({
           {winner.prize && <div className="mt-3 text-muted-foreground text-lg">Prize: {winner.prize}</div>}
         </div>
         <div className="mt-6 grid sm:grid-cols-2 gap-3">
-          <Button asChild className="h-12 rounded-full bg-whatsapp text-whatsapp-foreground font-semibold hover:brightness-110">
-            <a href={waHref} target="_blank" rel="noopener noreferrer">
-              <Share2 className="h-4 w-4" /> Share to WhatsApp
-            </a>
+          <Button onClick={handleShare} className="h-12 rounded-full bg-whatsapp text-whatsapp-foreground font-semibold hover:brightness-110">
+            <Share2 className="h-4 w-4" /> Share to WhatsApp
           </Button>
           {imgUrl && (
             <Button asChild variant="secondary" className="h-12 rounded-full font-semibold">

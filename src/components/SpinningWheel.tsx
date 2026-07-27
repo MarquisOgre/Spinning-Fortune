@@ -10,6 +10,7 @@ const PALETTE = [
 
 export type WheelHandle = {
   spinTo: (index: number) => Promise<void>;
+  settleTo: (index: number) => void;
   canvas: HTMLCanvasElement | null;
 };
 
@@ -74,8 +75,9 @@ export const SpinningWheel = forwardRef<WheelHandle, Props>(function SpinningWhe
       ctx.textAlign = "right";
       ctx.fillStyle = m.is_winner ? "#6b6478" : "#fff";
       ctx.font = "600 15px 'Inter', sans-serif";
-      const label = m.is_winner ? `~${m.name}~` : m.name;
-      ctx.fillText(truncate(label, 16), r - 18, 5);
+      const base = `#${m.position} ${m.name}`;
+      const label = m.is_winner ? `~${base}~` : base;
+      ctx.fillText(truncate(label, 20), r - 18, 5);
       ctx.restore();
     });
 
@@ -100,6 +102,14 @@ export const SpinningWheel = forwardRef<WheelHandle, Props>(function SpinningWhe
 
   useImperativeHandle(ref, () => ({
     canvas: canvasRef.current,
+    settleTo: (index: number) => {
+      const n = members.length;
+      if (n === 0) return;
+      const step = (Math.PI * 2) / n;
+      const target = -Math.PI / 2 - (index * step + step / 2);
+      rotRef.current = target;
+      setRotation(target);
+    },
     spinTo: (index: number) =>
       new Promise<void>((resolve) => {
         const n = members.length;
