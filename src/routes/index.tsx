@@ -13,7 +13,8 @@ import { toast } from "sonner";
 import { CalendarDays, Crown, Lock, Share2, Download, Trophy, Settings as SettingsIcon, Sun, Moon, History } from "lucide-react";
 import { SpinningWheel, type WheelHandle } from "@/components/SpinningWheel";
 import { useTheme } from "@/hooks/use-theme";
-import { drawWelcomeCard, drawWinnerCard, renderWinnerImage, shareWinner, CREAM } from "@/lib/winner-card";
+import { drawWelcomeCard, drawWinnerCard, renderWinnerImage, renderWinnerImageDataUrl, shareWinner } from "@/lib/winner-card";
+import { drawStage } from "@/lib/scene";
 import {
   fetchMembers,
   fetchSettings,
@@ -23,6 +24,8 @@ import {
   isSpinAllowedToday,
   buildWhatsappShareText,
   whatsappShareUrl,
+  monthNumber,
+  ordinal,
   type Member,
   type Winner,
 } from "@/lib/lottery";
@@ -46,6 +49,7 @@ type WinnerPopupData = {
   memberName: string;
   monthKey: string;
   monthLabel: string;
+  monthNumberLabel: string;
   prize?: string | null;
   title: string;
   videoUrl: string | null;
