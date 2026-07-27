@@ -194,13 +194,15 @@ function Index() {
     setSpinning(true);
     setWinner(null);
     setVideoUrl(null);
-    setWelcomeShown(false);
+    setSeenWelcomeId(null);
+    setDismissedWinnerId(null);
 
     // Pick an index that exists on the wheel (wheelMembers), and only among active/non-winner
     const eligibleWheelIdx = wheelMembers
       .map((m, i) => ({ m, i }))
       .filter(({ m }) => m.status === "active" && !m.is_winner);
-    const chosen = eligibleWheelIdx[Math.floor(Math.random() * eligibleWheelIdx.length)];
+    const forced = eligibleWheelIdx.find(({ m }) => m.id === forcedWinnerId);
+    const chosen = forced ?? eligibleWheelIdx[Math.floor(Math.random() * eligibleWheelIdx.length)];
     const picked = chosen.m;
 
     const cardBase = {
@@ -208,6 +210,7 @@ function Index() {
       monthLabel,
       memberName: picked.name,
       prize: settings.prize_amount,
+      monthNumberLabel: cycleMonthLabel,
     };
     phaseRef.current = { kind: "welcome", data: { ...cardBase, memberName: undefined } };
     await startRecording();
@@ -224,6 +227,7 @@ function Index() {
     await new Promise((r) => setTimeout(r, 3000));
     const url = await stopRecording();
     setVideoUrl(url);
+    const imageDataUrl = renderWinnerImageDataUrl(cardBase);
 
     // Server-side lock: unique index on winners.month_year prevents double-draws.
     const { error: e2 } = await supabase.from("winners").insert({
@@ -231,6 +235,7 @@ function Index() {
       member_name: picked.name,
       month_year: monthKey,
       video_url: url,
+      image_url: imageDataUrl,
     });
     if (e2) {
       toast.error("Draw already recorded for this month");
@@ -244,7 +249,7 @@ function Index() {
       .eq("id", picked.id);
     if (e1) toast.error(e1.message);
     setWinner(picked);
-    setWelcomeShown(false);
+    setForcedWinnerId("random");
     setWelcomeDialogOpen(true);
     setSpinning(false);
     load();
@@ -278,6 +283,7 @@ function Index() {
         memberName: winner.name,
         monthKey,
         monthLabel,
+        monthNumberLabel: cycleMonthLabel,
         prize: settings.prize_amount,
         title: settings.lottery_title,
         videoUrl,
@@ -292,6 +298,7 @@ function Index() {
       memberName: persistentWinner.member_name,
       monthKey: persistentWinner.month_year,
       monthLabel: persistentMonthLabel,
+      monthNumberLabel: `${ordinal(monthNumber(settings.start_month, persistentWinner.month_year))} Month`,
       prize: settings.prize_amount,
       title: settings.lottery_title,
       videoUrl: persistentWinner.video_url,
@@ -303,21 +310,24 @@ function Index() {
       }),
       groupLink: settings.whatsapp_group_link,
     };
-  }, [monthKey, monthLabel, persistentWinner, settings, shareText, videoUrl, winner]);
+  }, [cycleMonthLabel, monthKey, monthLabel, persistentWinner, settings, shareText, videoUrl, winner]);
 
+  // The welcome banner always comes first; the winner popup opens when it closes.
   useEffect(() => {
-    if (!winnerPopup || winner || welcomeShown || dismissedWinnerId === winnerPopup.recordId) return;
+    if (!winnerPopup) return;
+    if (seenWelcomeId === winnerPopup.recordId) return;
+    if (dismissedWinnerId === winnerPopup.recordId) return;
     setWelcomeDialogOpen(true);
-  }, [dismissedWinnerId, welcomeShown, winner, winnerPopup]);
+  }, [dismissedWinnerId, seenWelcomeId, winnerPopup]);
 
-  // Keep the wheel parked on the most recent winner until the next spin.
+  // Keep the wheel parked on the most recent winner (also after a refresh).
   useEffect(() => {
-    if (spinning || !currentMonthWinner || !wheelMembers.length) return;
+    if (spinning || !latestWinner || !wheelMembers.length) return;
     const idx = wheelMembers.findIndex(
-      (m) => m.id === currentMonthWinner.member_id || m.name === currentMonthWinner.member_name,
+      (m) => m.id === latestWinner.member_id || m.name === latestWinner.member_name,
     );
     if (idx >= 0) wheelRef.current?.settleTo(idx);
-  }, [currentMonthWinner, spinning, wheelMembers]);
+  }, [latestWinner, spinning, wheelMembers]);
 
   const nextDrawLabel = nextMonthLabel(monthKey);
 
