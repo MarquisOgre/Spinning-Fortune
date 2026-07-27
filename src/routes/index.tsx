@@ -405,7 +405,7 @@ function Index() {
 
           <div className="mt-4 flex flex-col md:flex-row items-center justify-center gap-4">
   <h1 className="text-3xl md:text-4xl font-serif text-gold">
-    Spin for {monthLabel}
+    Spin for {monthLabel} · {cycleMonthLabel}
   </h1>
 
   <Button
@@ -441,6 +441,23 @@ function Index() {
   </p>
 )}
 
+{isAdmin && !alreadySpunThisMonth && (
+  <div className="mt-3 flex items-center gap-2 text-sm">
+    <label htmlFor="forced-winner" className="text-muted-foreground">Stop at</label>
+    <select
+      id="forced-winner"
+      value={forcedWinnerId}
+      onChange={(e) => setForcedWinnerId(e.target.value)}
+      className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+    >
+      <option value="random">Random member</option>
+      {eligible.map((m) => (
+        <option key={m.id} value={m.id}>{`#${m.position} ${m.name}`}</option>
+      ))}
+    </select>
+  </div>
+)}
+
         </main>
 
         <aside className="h-full rounded-2xl border border-border/60 bg-card/80 p-4 flex flex-col min-h-0">
@@ -451,7 +468,10 @@ function Index() {
             {winners.map((w) => (
               <li key={w.id} className="rounded-lg bg-background/60 px-3 py-2">
                 <div className="text-sm font-semibold text-primary">{w.member_name}</div>
-                <div className="text-xs text-muted-foreground">{w.month_year}</div>
+                <div className="text-xs text-muted-foreground">
+                  {settings ? `${ordinal(monthNumber(settings.start_month, w.month_year))} Month · ` : ""}
+                  {monthLabelFromKey(w.month_year)}
+                </div>
               </li>
             ))}
             {winners.length === 0 && <li className="text-sm text-muted-foreground">No winners yet.</li>}
@@ -480,17 +500,22 @@ function Index() {
         onOpenChange={(open) => {
           setWelcomeDialogOpen(open);
           if (!open) {
-            setWelcomeShown(true);
+            if (winnerPopup) setSeenWelcomeId(winnerPopup.recordId);
             if (winnerPopup) setWinnerDialogOpen(true);
           }
         }}
       >
-        <DialogContent className="max-w-md rounded-3xl border-primary/40 bg-card p-8 text-center shadow-[var(--shadow-card)]">
+        <DialogContent className="max-w-2xl rounded-3xl border-2 border-primary/40 bg-card p-8 text-center shadow-[var(--shadow-glow)]">
           <DialogHeader className="items-center text-center">
-            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
               <CalendarDays className="h-7 w-7" />
             </div>
-            <DialogTitle className="text-2xl text-gold">Welcome to {settings?.lottery_title ?? "the Lucky Draw"}</DialogTitle>
+            <DialogTitle className="text-3xl md:text-4xl font-serif text-gold">
+              Welcome to {settings?.lottery_title ?? "the Lucky Draw"}
+            </DialogTitle>
+            <div className="mt-1 text-sm uppercase tracking-[0.3em] text-primary">
+              {winnerPopup?.monthNumberLabel ?? cycleMonthLabel} · {winnerPopup?.monthLabel ?? monthLabel}
+            </div>
             <DialogDescription className="text-base text-muted-foreground">
               The {monthLabel} draw is complete. Next up: the {nextDrawLabel} draw, unlocking on the configured spin date.
             </DialogDescription>
@@ -498,10 +523,10 @@ function Index() {
           <Button
             onClick={() => {
               setWelcomeDialogOpen(false);
-              setWelcomeShown(true);
+              if (winnerPopup) setSeenWelcomeId(winnerPopup.recordId);
               if (winnerPopup) setWinnerDialogOpen(true);
             }}
-            className="mt-2 rounded-full bg-gold px-8 text-primary-foreground"
+            className="mt-4 h-12 rounded-full bg-gold px-10 text-primary-foreground"
           >
             See the winner
           </Button>
