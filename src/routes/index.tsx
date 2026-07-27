@@ -547,12 +547,6 @@ const placeholderMembers: Member[] = Array.from({ length: 20 }, (_, i) => ({
   status: "active",
 }));
 
-function ordinal(n: number) {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
-
 function monthLabelFromKey(key: string) {
   const [year, month] = key.split("-");
   return new Date(Number(year), Number(month) - 1, 1).toLocaleString("en-US", {
