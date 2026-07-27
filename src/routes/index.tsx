@@ -533,43 +533,34 @@ function WinnerDialog({
 
   useEffect(() => {
     if (!winner) return;
-    const c = document.createElement("canvas");
-    c.width = 1200;
-    c.height = 630;
-    const ctx = c.getContext("2d");
-    if (!ctx) return;
-    const g = ctx.createLinearGradient(0, 0, 1200, 630);
-    g.addColorStop(0, "#1a0f2e");
-    g.addColorStop(1, "#3b1e5e");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 1200, 630);
-    ctx.fillStyle = "#f5c34a";
-    ctx.font = "600 32px serif";
-    ctx.textAlign = "center";
-    ctx.fillText(winner.title.toUpperCase(), 600, 120);
-    ctx.font = "italic 28px serif";
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.fillText(winner.monthLabel, 600, 170);
-    ctx.fillStyle = "#fff";
-    ctx.font = "600 48px sans-serif";
-    ctx.fillText("\uD83C\uDFC6 WINNER \uD83C\uDFC6", 600, 280);
-    ctx.fillStyle = "#f5c34a";
-    ctx.font = "700 84px serif";
-    ctx.fillText(winner.memberName, 600, 400);
-    if (winner.prize) {
-      ctx.fillStyle = "rgba(255,255,255,0.8)";
-      ctx.font = "500 36px sans-serif";
-      ctx.fillText(`Prize: ${winner.prize}`, 600, 470);
-    }
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.font = "500 22px sans-serif";
-    ctx.fillText("Congratulations!", 600, 560);
-    c.toBlob((b) => b && setImgUrl(URL.createObjectURL(b)), "image/png");
+    let active = true;
+    renderWinnerImage({
+      title: winner.title,
+      monthLabel: winner.monthLabel,
+      memberName: winner.memberName,
+      prize: winner.prize,
+    }).then((url) => active && setImgUrl(url));
+    return () => {
+      active = false;
+    };
   }, [winner]);
 
   if (!winner) return null;
 
   const waHref = whatsappShareUrl(winner.shareText, winner.groupLink);
+
+  const handleShare = async () => {
+    const result = await shareWinner({
+      text: winner.shareText,
+      imageUrl: imgUrl,
+      videoUrl: winner.videoUrl,
+      waHref,
+      monthKey: winner.monthKey,
+    });
+    if (result === "fallback") {
+      toast.info("Winner image & video downloaded — attach them in WhatsApp (message text copied).");
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -587,10 +578,8 @@ function WinnerDialog({
           {winner.prize && <div className="mt-3 text-muted-foreground text-lg">Prize: {winner.prize}</div>}
         </div>
         <div className="mt-6 grid sm:grid-cols-2 gap-3">
-          <Button asChild className="h-12 rounded-full bg-whatsapp text-whatsapp-foreground font-semibold hover:brightness-110">
-            <a href={waHref} target="_blank" rel="noopener noreferrer">
-              <Share2 className="h-4 w-4" /> Share to WhatsApp
-            </a>
+          <Button onClick={handleShare} className="h-12 rounded-full bg-whatsapp text-whatsapp-foreground font-semibold hover:brightness-110">
+            <Share2 className="h-4 w-4" /> Share to WhatsApp
           </Button>
           {imgUrl && (
             <Button asChild variant="secondary" className="h-12 rounded-full font-semibold">
