@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { CalendarDays, Crown, Lock, Share2, Download, Trophy, Settings as SettingsIcon, Sun, Moon, History } from "lucide-react";
 import { SpinningWheel, type WheelHandle } from "@/components/SpinningWheel";
 import { useTheme } from "@/hooks/use-theme";
+import { drawWelcomeCard, drawWinnerCard, renderWinnerImage, shareWinner, CREAM } from "@/lib/winner-card";
 import {
   fetchMembers,
   fetchSettings,
@@ -69,6 +70,9 @@ function Index() {
   const [dismissedWinnerId, setDismissedWinnerId] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
+  const composeRef = useRef<HTMLCanvasElement | null>(null);
+  const phaseRef = useRef<{ kind: "welcome" | "wheel" | "winner"; data: any }>({ kind: "welcome", data: null });
+  const rafRef = useRef<number | null>(null);
 
   const load = async () => {
     const [m, s, w] = await Promise.all([fetchMembers(), fetchSettings(), fetchWinners()]);
@@ -106,12 +110,38 @@ function Index() {
   const dateOk = settings ? isSpinAllowedToday(settings.spin_day) : false;
   const canSpin = isAdmin && !spinning && !alreadySpunThisMonth && dateOk && eligible.length > 0;
 
+  // Records a composed canvas: welcome banner → live wheel spin → winner card.
   const startRecording = async () => {
-    const canvas = wheelRef.current?.canvas;
-    if (!canvas || typeof (canvas as HTMLCanvasElement).captureStream !== "function") return null;
     try {
-      const stream = (canvas as HTMLCanvasElement).captureStream(30);
-      const rec = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp9" });
+      const c = document.createElement("canvas");
+      c.width = 1200;
+      c.height = 630;
+      composeRef.current = c;
+      const ctx = c.getContext("2d");
+      if (!ctx || typeof c.captureStream !== "function") return null;
+
+      const frame = () => {
+        const phase = phaseRef.current;
+        if (phase.kind === "welcome") drawWelcomeCard(ctx, 1200, 630, phase.data);
+        else if (phase.kind === "winner") drawWinnerCard(ctx, 1200, 630, phase.data);
+        else {
+          const g = ctx.createLinearGradient(0, 0, 1200, 630);
+          g.addColorStop(0, CREAM.bgFrom);
+          g.addColorStop(1, CREAM.bgTo);
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, 1200, 630);
+          const wc = wheelRef.current?.canvas;
+          if (wc) {
+            const size = 570;
+            ctx.drawImage(wc, 600 - size / 2, 315 - size / 2, size, size);
+          }
+        }
+        rafRef.current = requestAnimationFrame(frame);
+      };
+      frame();
+
+      const stream = c.captureStream(30);
+      const rec = new MediaRecorder(stream, { mimeType: "video/webm" });
       chunksRef.current = [];
       rec.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
       rec.start();
@@ -125,6 +155,8 @@ function Index() {
   const stopRecording = () =>
     new Promise<string | null>((resolve) => {
       const rec = recorderRef.current;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
       if (!rec) return resolve(null);
       rec.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: "video/webm" });
@@ -148,14 +180,25 @@ function Index() {
     const chosen = eligibleWheelIdx[Math.floor(Math.random() * eligibleWheelIdx.length)];
     const picked = chosen.m;
 
+    const cardBase = {
+      title: settings.lottery_title,
+      monthLabel,
+      memberName: picked.name,
+      prize: settings.prize_amount,
+    };
+    phaseRef.current = { kind: "welcome", data: { ...cardBase, memberName: undefined } };
     await startRecording();
+    await new Promise((r) => setTimeout(r, 2200));
+    phaseRef.current = { kind: "wheel", data: null };
     const wheel = wheelRef.current;
     if (!wheel) {
       setSpinning(false);
       return;
     }
     await wheel.spinTo(chosen.i);
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, 900));
+    phaseRef.current = { kind: "winner", data: cardBase };
+    await new Promise((r) => setTimeout(r, 3000));
     const url = await stopRecording();
     setVideoUrl(url);
 
@@ -178,7 +221,8 @@ function Index() {
       .eq("id", picked.id);
     if (e1) toast.error(e1.message);
     setWinner(picked);
-    setWinnerDialogOpen(true);
+    setWelcomeShown(false);
+    setWelcomeDialogOpen(true);
     setSpinning(false);
     load();
   };
