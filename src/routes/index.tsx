@@ -70,13 +70,20 @@ function Index() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [winnerDialogOpen, setWinnerDialogOpen] = useState(false);
   const [welcomeDialogOpen, setWelcomeDialogOpen] = useState(false);
-  const [welcomeShown, setWelcomeShown] = useState(false);
   const [dismissedWinnerId, setDismissedWinnerId] = useState<string | null>(null);
+  const [seenWelcomeId, setSeenWelcomeId] = useState<string | null>(null);
+  const [forcedWinnerId, setForcedWinnerId] = useState<string>("random");
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const composeRef = useRef<HTMLCanvasElement | null>(null);
   const phaseRef = useRef<{ kind: "welcome" | "wheel" | "winner"; data: any }>({ kind: "welcome", data: null });
   const rafRef = useRef<number | null>(null);
+  const stageRef = useRef<{ members: Member[]; winners: Winner[]; title: string; monthLabel: string }>({
+    members: [],
+    winners: [],
+    title: "",
+    monthLabel: "",
+  });
 
   const load = async () => {
     const [m, s, w] = await Promise.all([fetchMembers(), fetchSettings(), fetchWinners()]);
@@ -106,13 +113,29 @@ function Index() {
   );
   const monthKey = currentMonthKey();
   const monthLabel = currentMonthLabel();
+  const cycleMonthNo = settings ? monthNumber(settings.start_month, monthKey) : 1;
+  const cycleMonthLabel = `${ordinal(cycleMonthNo)} Month`;
   const alreadySpunThisMonth = winners.some((w) => w.month_year === monthKey);
   const currentMonthWinner = useMemo(
     () => winners.find((w) => w.month_year === monthKey) ?? null,
     [winners, monthKey],
   );
+  const latestWinner = useMemo(
+    () =>
+      [...winners].sort((a, b) => b.month_year.localeCompare(a.month_year))[0] ?? null,
+    [winners],
+  );
   const dateOk = settings ? isSpinAllowedToday(settings.spin_day) : false;
   const canSpin = isAdmin && !spinning && !alreadySpunThisMonth && dateOk && eligible.length > 0;
+
+  useEffect(() => {
+    stageRef.current = {
+      members: members.length ? members : placeholderMembers,
+      winners,
+      title: settings?.lottery_title ?? "Lucky Draw",
+      monthLabel,
+    };
+  }, [members, winners, settings?.lottery_title, monthLabel]);
 
   // Records a composed canvas: welcome banner → live wheel spin → winner card.
   const startRecording = async () => {
@@ -128,18 +151,14 @@ function Index() {
         const phase = phaseRef.current;
         if (phase.kind === "welcome") drawWelcomeCard(ctx, 1200, 630, phase.data);
         else if (phase.kind === "winner") drawWinnerCard(ctx, 1200, 630, phase.data);
-        else {
-          const g = ctx.createLinearGradient(0, 0, 1200, 630);
-          g.addColorStop(0, CREAM.bgFrom);
-          g.addColorStop(1, CREAM.bgTo);
-          ctx.fillStyle = g;
-          ctx.fillRect(0, 0, 1200, 630);
-          const wc = wheelRef.current?.canvas;
-          if (wc) {
-            const size = 570;
-            ctx.drawImage(wc, 600 - size / 2, 315 - size / 2, size, size);
-          }
-        }
+        else
+          drawStage(ctx, 1200, 630, {
+            title: stageRef.current.title,
+            monthLabel: stageRef.current.monthLabel,
+            members: stageRef.current.members,
+            winners: stageRef.current.winners,
+            wheel: wheelRef.current?.canvas ?? null,
+          });
         rafRef.current = requestAnimationFrame(frame);
       };
       frame();
