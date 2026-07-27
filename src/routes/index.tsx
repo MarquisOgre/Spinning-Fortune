@@ -13,7 +13,8 @@ import { toast } from "sonner";
 import { CalendarDays, Crown, Lock, Share2, Download, Trophy, Settings as SettingsIcon, Sun, Moon, History } from "lucide-react";
 import { SpinningWheel, type WheelHandle } from "@/components/SpinningWheel";
 import { useTheme } from "@/hooks/use-theme";
-import { drawWelcomeCard, drawWinnerCard, renderWinnerImage, shareWinner, CREAM } from "@/lib/winner-card";
+import { drawWelcomeCard, drawWinnerCard, renderWinnerImage, renderWinnerImageDataUrl, shareWinner } from "@/lib/winner-card";
+import { drawStage } from "@/lib/scene";
 import {
   fetchMembers,
   fetchSettings,
@@ -23,6 +24,8 @@ import {
   isSpinAllowedToday,
   buildWhatsappShareText,
   whatsappShareUrl,
+  monthNumber,
+  ordinal,
   type Member,
   type Winner,
 } from "@/lib/lottery";
@@ -46,6 +49,7 @@ type WinnerPopupData = {
   memberName: string;
   monthKey: string;
   monthLabel: string;
+  monthNumberLabel: string;
   prize?: string | null;
   title: string;
   videoUrl: string | null;
@@ -66,13 +70,20 @@ function Index() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [winnerDialogOpen, setWinnerDialogOpen] = useState(false);
   const [welcomeDialogOpen, setWelcomeDialogOpen] = useState(false);
-  const [welcomeShown, setWelcomeShown] = useState(false);
   const [dismissedWinnerId, setDismissedWinnerId] = useState<string | null>(null);
+  const [seenWelcomeId, setSeenWelcomeId] = useState<string | null>(null);
+  const [forcedWinnerId, setForcedWinnerId] = useState<string>("random");
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const composeRef = useRef<HTMLCanvasElement | null>(null);
   const phaseRef = useRef<{ kind: "welcome" | "wheel" | "winner"; data: any }>({ kind: "welcome", data: null });
   const rafRef = useRef<number | null>(null);
+  const stageRef = useRef<{ members: Member[]; winners: Winner[]; title: string; monthLabel: string }>({
+    members: [],
+    winners: [],
+    title: "",
+    monthLabel: "",
+  });
 
   const load = async () => {
     const [m, s, w] = await Promise.all([fetchMembers(), fetchSettings(), fetchWinners()]);
@@ -102,13 +113,29 @@ function Index() {
   );
   const monthKey = currentMonthKey();
   const monthLabel = currentMonthLabel();
+  const cycleMonthNo = settings ? monthNumber(settings.start_month, monthKey) : 1;
+  const cycleMonthLabel = `${ordinal(cycleMonthNo)} Month`;
   const alreadySpunThisMonth = winners.some((w) => w.month_year === monthKey);
   const currentMonthWinner = useMemo(
     () => winners.find((w) => w.month_year === monthKey) ?? null,
     [winners, monthKey],
   );
+  const latestWinner = useMemo(
+    () =>
+      [...winners].sort((a, b) => b.month_year.localeCompare(a.month_year))[0] ?? null,
+    [winners],
+  );
   const dateOk = settings ? isSpinAllowedToday(settings.spin_day) : false;
   const canSpin = isAdmin && !spinning && !alreadySpunThisMonth && dateOk && eligible.length > 0;
+
+  useEffect(() => {
+    stageRef.current = {
+      members: members.length ? members : placeholderMembers,
+      winners,
+      title: settings?.lottery_title ?? "Lucky Draw",
+      monthLabel,
+    };
+  }, [members, winners, settings?.lottery_title, monthLabel]);
 
   // Records a composed canvas: welcome banner → live wheel spin → winner card.
   const startRecording = async () => {
@@ -124,18 +151,14 @@ function Index() {
         const phase = phaseRef.current;
         if (phase.kind === "welcome") drawWelcomeCard(ctx, 1200, 630, phase.data);
         else if (phase.kind === "winner") drawWinnerCard(ctx, 1200, 630, phase.data);
-        else {
-          const g = ctx.createLinearGradient(0, 0, 1200, 630);
-          g.addColorStop(0, CREAM.bgFrom);
-          g.addColorStop(1, CREAM.bgTo);
-          ctx.fillStyle = g;
-          ctx.fillRect(0, 0, 1200, 630);
-          const wc = wheelRef.current?.canvas;
-          if (wc) {
-            const size = 570;
-            ctx.drawImage(wc, 600 - size / 2, 315 - size / 2, size, size);
-          }
-        }
+        else
+          drawStage(ctx, 1200, 630, {
+            title: stageRef.current.title,
+            monthLabel: stageRef.current.monthLabel,
+            members: stageRef.current.members,
+            winners: stageRef.current.winners,
+            wheel: wheelRef.current?.canvas ?? null,
+          });
         rafRef.current = requestAnimationFrame(frame);
       };
       frame();
@@ -171,13 +194,15 @@ function Index() {
     setSpinning(true);
     setWinner(null);
     setVideoUrl(null);
-    setWelcomeShown(false);
+    setSeenWelcomeId(null);
+    setDismissedWinnerId(null);
 
     // Pick an index that exists on the wheel (wheelMembers), and only among active/non-winner
     const eligibleWheelIdx = wheelMembers
       .map((m, i) => ({ m, i }))
       .filter(({ m }) => m.status === "active" && !m.is_winner);
-    const chosen = eligibleWheelIdx[Math.floor(Math.random() * eligibleWheelIdx.length)];
+    const forced = eligibleWheelIdx.find(({ m }) => m.id === forcedWinnerId);
+    const chosen = forced ?? eligibleWheelIdx[Math.floor(Math.random() * eligibleWheelIdx.length)];
     const picked = chosen.m;
 
     const cardBase = {
@@ -185,6 +210,7 @@ function Index() {
       monthLabel,
       memberName: picked.name,
       prize: settings.prize_amount,
+      monthNumberLabel: cycleMonthLabel,
     };
     phaseRef.current = { kind: "welcome", data: { ...cardBase, memberName: undefined } };
     await startRecording();
@@ -201,6 +227,7 @@ function Index() {
     await new Promise((r) => setTimeout(r, 3000));
     const url = await stopRecording();
     setVideoUrl(url);
+    const imageDataUrl = renderWinnerImageDataUrl(cardBase);
 
     // Server-side lock: unique index on winners.month_year prevents double-draws.
     const { error: e2 } = await supabase.from("winners").insert({
@@ -208,6 +235,7 @@ function Index() {
       member_name: picked.name,
       month_year: monthKey,
       video_url: url,
+      image_url: imageDataUrl,
     });
     if (e2) {
       toast.error("Draw already recorded for this month");
@@ -221,7 +249,7 @@ function Index() {
       .eq("id", picked.id);
     if (e1) toast.error(e1.message);
     setWinner(picked);
-    setWelcomeShown(false);
+    setForcedWinnerId("random");
     setWelcomeDialogOpen(true);
     setSpinning(false);
     load();
@@ -255,6 +283,7 @@ function Index() {
         memberName: winner.name,
         monthKey,
         monthLabel,
+        monthNumberLabel: cycleMonthLabel,
         prize: settings.prize_amount,
         title: settings.lottery_title,
         videoUrl,
@@ -269,6 +298,7 @@ function Index() {
       memberName: persistentWinner.member_name,
       monthKey: persistentWinner.month_year,
       monthLabel: persistentMonthLabel,
+      monthNumberLabel: `${ordinal(monthNumber(settings.start_month, persistentWinner.month_year))} Month`,
       prize: settings.prize_amount,
       title: settings.lottery_title,
       videoUrl: persistentWinner.video_url,
@@ -280,21 +310,24 @@ function Index() {
       }),
       groupLink: settings.whatsapp_group_link,
     };
-  }, [monthKey, monthLabel, persistentWinner, settings, shareText, videoUrl, winner]);
+  }, [cycleMonthLabel, monthKey, monthLabel, persistentWinner, settings, shareText, videoUrl, winner]);
 
+  // The welcome banner always comes first; the winner popup opens when it closes.
   useEffect(() => {
-    if (!winnerPopup || winner || welcomeShown || dismissedWinnerId === winnerPopup.recordId) return;
+    if (!winnerPopup) return;
+    if (seenWelcomeId === winnerPopup.recordId) return;
+    if (dismissedWinnerId === winnerPopup.recordId) return;
     setWelcomeDialogOpen(true);
-  }, [dismissedWinnerId, welcomeShown, winner, winnerPopup]);
+  }, [dismissedWinnerId, seenWelcomeId, winnerPopup]);
 
-  // Keep the wheel parked on the most recent winner until the next spin.
+  // Keep the wheel parked on the most recent winner (also after a refresh).
   useEffect(() => {
-    if (spinning || !currentMonthWinner || !wheelMembers.length) return;
+    if (spinning || !latestWinner || !wheelMembers.length) return;
     const idx = wheelMembers.findIndex(
-      (m) => m.id === currentMonthWinner.member_id || m.name === currentMonthWinner.member_name,
+      (m) => m.id === latestWinner.member_id || m.name === latestWinner.member_name,
     );
     if (idx >= 0) wheelRef.current?.settleTo(idx);
-  }, [currentMonthWinner, spinning, wheelMembers]);
+  }, [latestWinner, spinning, wheelMembers]);
 
   const nextDrawLabel = nextMonthLabel(monthKey);
 
@@ -372,7 +405,7 @@ function Index() {
 
           <div className="mt-4 flex flex-col md:flex-row items-center justify-center gap-4">
   <h1 className="text-3xl md:text-4xl font-serif text-gold">
-    Spin for {monthLabel}
+    Spin for {monthLabel} · {cycleMonthLabel}
   </h1>
 
   <Button
@@ -408,6 +441,23 @@ function Index() {
   </p>
 )}
 
+{isAdmin && !alreadySpunThisMonth && (
+  <div className="mt-3 flex items-center gap-2 text-sm">
+    <label htmlFor="forced-winner" className="text-muted-foreground">Stop at</label>
+    <select
+      id="forced-winner"
+      value={forcedWinnerId}
+      onChange={(e) => setForcedWinnerId(e.target.value)}
+      className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+    >
+      <option value="random">Random member</option>
+      {eligible.map((m) => (
+        <option key={m.id} value={m.id}>{`#${m.position} ${m.name}`}</option>
+      ))}
+    </select>
+  </div>
+)}
+
         </main>
 
         <aside className="h-full rounded-2xl border border-border/60 bg-card/80 p-4 flex flex-col min-h-0">
@@ -418,7 +468,10 @@ function Index() {
             {winners.map((w) => (
               <li key={w.id} className="rounded-lg bg-background/60 px-3 py-2">
                 <div className="text-sm font-semibold text-primary">{w.member_name}</div>
-                <div className="text-xs text-muted-foreground">{w.month_year}</div>
+                <div className="text-xs text-muted-foreground">
+                  {settings ? `${ordinal(monthNumber(settings.start_month, w.month_year))} Month · ` : ""}
+                  {monthLabelFromKey(w.month_year)}
+                </div>
               </li>
             ))}
             {winners.length === 0 && <li className="text-sm text-muted-foreground">No winners yet.</li>}
@@ -447,17 +500,22 @@ function Index() {
         onOpenChange={(open) => {
           setWelcomeDialogOpen(open);
           if (!open) {
-            setWelcomeShown(true);
+            if (winnerPopup) setSeenWelcomeId(winnerPopup.recordId);
             if (winnerPopup) setWinnerDialogOpen(true);
           }
         }}
       >
-        <DialogContent className="max-w-md rounded-3xl border-primary/40 bg-card p-8 text-center shadow-[var(--shadow-card)]">
+        <DialogContent className="max-w-2xl rounded-3xl border-2 border-primary/40 bg-card p-8 text-center shadow-[var(--shadow-glow)]">
           <DialogHeader className="items-center text-center">
-            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
               <CalendarDays className="h-7 w-7" />
             </div>
-            <DialogTitle className="text-2xl text-gold">Welcome to {settings?.lottery_title ?? "the Lucky Draw"}</DialogTitle>
+            <DialogTitle className="text-3xl md:text-4xl font-serif text-gold">
+              Welcome to {settings?.lottery_title ?? "the Lucky Draw"}
+            </DialogTitle>
+            <div className="mt-1 text-sm uppercase tracking-[0.3em] text-primary">
+              {winnerPopup?.monthNumberLabel ?? cycleMonthLabel} · {winnerPopup?.monthLabel ?? monthLabel}
+            </div>
             <DialogDescription className="text-base text-muted-foreground">
               The {monthLabel} draw is complete. Next up: the {nextDrawLabel} draw, unlocking on the configured spin date.
             </DialogDescription>
@@ -465,10 +523,10 @@ function Index() {
           <Button
             onClick={() => {
               setWelcomeDialogOpen(false);
-              setWelcomeShown(true);
+              if (winnerPopup) setSeenWelcomeId(winnerPopup.recordId);
               if (winnerPopup) setWinnerDialogOpen(true);
             }}
-            className="mt-2 rounded-full bg-gold px-8 text-primary-foreground"
+            className="mt-4 h-12 rounded-full bg-gold px-10 text-primary-foreground"
           >
             See the winner
           </Button>
@@ -488,12 +546,6 @@ const placeholderMembers: Member[] = Array.from({ length: 20 }, (_, i) => ({
   won_at: null,
   status: "active",
 }));
-
-function ordinal(n: number) {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
 
 function monthLabelFromKey(key: string) {
   const [year, month] = key.split("-");
@@ -530,6 +582,7 @@ function WinnerDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
+  const [shareState, setShareState] = useState<"idle" | "sending" | "sent" | "failed">("idle");
 
   useEffect(() => {
     if (!winner) return;
@@ -539,6 +592,7 @@ function WinnerDialog({
       monthLabel: winner.monthLabel,
       memberName: winner.memberName,
       prize: winner.prize,
+      monthNumberLabel: winner.monthNumberLabel,
     }).then((url) => active && setImgUrl(url));
     return () => {
       active = false;
@@ -550,6 +604,7 @@ function WinnerDialog({
   const waHref = whatsappShareUrl(winner.shareText, winner.groupLink);
 
   const handleShare = async () => {
+    setShareState("sending");
     const result = await shareWinner({
       text: winner.shareText,
       imageUrl: imgUrl,
@@ -559,6 +614,12 @@ function WinnerDialog({
     });
     if (result === "fallback") {
       toast.info("Winner image & video downloaded — attach them in WhatsApp (message text copied).");
+    }
+    if (result === "failed") {
+      toast.error("WhatsApp post failed — use the download buttons and retry.");
+      setShareState("failed");
+    } else {
+      setShareState("sent");
     }
   };
 
@@ -570,7 +631,7 @@ function WinnerDialog({
             Winner of the Month
           </DialogTitle>
           <DialogDescription className="text-sm uppercase tracking-[0.25em] text-muted-foreground">
-            {winner.monthLabel}
+            {winner.monthNumberLabel} · {winner.monthLabel}
           </DialogDescription>
         </DialogHeader>
         <div className="text-center">
@@ -578,8 +639,9 @@ function WinnerDialog({
           {winner.prize && <div className="mt-3 text-muted-foreground text-lg">Prize: {winner.prize}</div>}
         </div>
         <div className="mt-6 grid sm:grid-cols-2 gap-3">
-          <Button onClick={handleShare} className="h-12 rounded-full bg-whatsapp text-whatsapp-foreground font-semibold hover:brightness-110">
-            <Share2 className="h-4 w-4" /> Share to WhatsApp
+          <Button onClick={handleShare} disabled={shareState === "sending"} className="h-12 rounded-full bg-whatsapp text-whatsapp-foreground font-semibold hover:brightness-110">
+            <Share2 className="h-4 w-4" />
+            {shareState === "sending" ? "Sharing…" : shareState === "failed" ? "Retry WhatsApp share" : "Share to WhatsApp"}
           </Button>
           {imgUrl && (
             <Button asChild variant="secondary" className="h-12 rounded-full font-semibold">
@@ -600,6 +662,15 @@ function WinnerDialog({
             </Button>
           )}
         </div>
+        {shareState !== "idle" && (
+          <p className={`mt-3 text-center text-sm ${shareState === "failed" ? "text-destructive" : "text-muted-foreground"}`}>
+            {shareState === "sending"
+              ? "Preparing the winner image and spin video…"
+              : shareState === "sent"
+              ? "WhatsApp post queued with the winner image and spin video."
+              : "WhatsApp post failed. Download the proofs below and retry."}
+          </p>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -57,8 +57,10 @@ export type Database = {
           id: number
           logo_url: string | null
           lottery_title: string
+          member_count: number
           prize_amount: string | null
           spin_day: number
+          start_month: string
           whatsapp_group_link: string | null
           whatsapp_group_name: string | null
           winning_popup_days: number
@@ -69,8 +71,10 @@ export type Database = {
           id?: number
           logo_url?: string | null
           lottery_title?: string
+          member_count?: number
           prize_amount?: string | null
           spin_day?: number
+          start_month?: string
           whatsapp_group_link?: string | null
           whatsapp_group_name?: string | null
           winning_popup_days?: number
@@ -81,8 +85,10 @@ export type Database = {
           id?: number
           logo_url?: string | null
           lottery_title?: string
+          member_count?: number
           prize_amount?: string | null
           spin_day?: number
+          start_month?: string
           whatsapp_group_link?: string | null
           whatsapp_group_name?: string | null
           winning_popup_days?: number
@@ -113,6 +119,7 @@ export type Database = {
       winners: {
         Row: {
           id: string
+          image_url: string | null
           member_id: string | null
           member_name: string
           month_year: string
@@ -121,6 +128,7 @@ export type Database = {
         }
         Insert: {
           id?: string
+          image_url?: string | null
           member_id?: string | null
           member_name: string
           month_year: string
@@ -129,6 +137,7 @@ export type Database = {
         }
         Update: {
           id?: string
+          image_url?: string | null
           member_id?: string | null
           member_name?: string
           month_year?: string
