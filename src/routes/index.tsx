@@ -582,6 +582,7 @@ function WinnerDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
+  const [shareState, setShareState] = useState<"idle" | "sending" | "sent" | "failed">("idle");
 
   useEffect(() => {
     if (!winner) return;
@@ -591,6 +592,7 @@ function WinnerDialog({
       monthLabel: winner.monthLabel,
       memberName: winner.memberName,
       prize: winner.prize,
+      monthNumberLabel: winner.monthNumberLabel,
     }).then((url) => active && setImgUrl(url));
     return () => {
       active = false;
@@ -602,6 +604,7 @@ function WinnerDialog({
   const waHref = whatsappShareUrl(winner.shareText, winner.groupLink);
 
   const handleShare = async () => {
+    setShareState("sending");
     const result = await shareWinner({
       text: winner.shareText,
       imageUrl: imgUrl,
@@ -611,6 +614,12 @@ function WinnerDialog({
     });
     if (result === "fallback") {
       toast.info("Winner image & video downloaded — attach them in WhatsApp (message text copied).");
+    }
+    if (result === "failed") {
+      toast.error("WhatsApp post failed — use the download buttons and retry.");
+      setShareState("failed");
+    } else {
+      setShareState("sent");
     }
   };
 
@@ -622,7 +631,7 @@ function WinnerDialog({
             Winner of the Month
           </DialogTitle>
           <DialogDescription className="text-sm uppercase tracking-[0.25em] text-muted-foreground">
-            {winner.monthLabel}
+            {winner.monthNumberLabel} · {winner.monthLabel}
           </DialogDescription>
         </DialogHeader>
         <div className="text-center">
@@ -630,8 +639,9 @@ function WinnerDialog({
           {winner.prize && <div className="mt-3 text-muted-foreground text-lg">Prize: {winner.prize}</div>}
         </div>
         <div className="mt-6 grid sm:grid-cols-2 gap-3">
-          <Button onClick={handleShare} className="h-12 rounded-full bg-whatsapp text-whatsapp-foreground font-semibold hover:brightness-110">
-            <Share2 className="h-4 w-4" /> Share to WhatsApp
+          <Button onClick={handleShare} disabled={shareState === "sending"} className="h-12 rounded-full bg-whatsapp text-whatsapp-foreground font-semibold hover:brightness-110">
+            <Share2 className="h-4 w-4" />
+            {shareState === "sending" ? "Sharing…" : shareState === "failed" ? "Retry WhatsApp share" : "Share to WhatsApp"}
           </Button>
           {imgUrl && (
             <Button asChild variant="secondary" className="h-12 rounded-full font-semibold">
@@ -652,6 +662,15 @@ function WinnerDialog({
             </Button>
           )}
         </div>
+        {shareState !== "idle" && (
+          <p className={`mt-3 text-center text-sm ${shareState === "failed" ? "text-destructive" : "text-muted-foreground"}`}>
+            {shareState === "sending"
+              ? "Preparing the winner image and spin video…"
+              : shareState === "sent"
+              ? "WhatsApp post queued with the winner image and spin video."
+              : "WhatsApp post failed. Download the proofs below and retry."}
+          </p>
+        )}
       </DialogContent>
     </Dialog>
   );
