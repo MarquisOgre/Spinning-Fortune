@@ -222,7 +222,8 @@ function AdminPage() {
           </div>
         </section>
 
-        <section className="lg:col-span-2 rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col min-h-0">
+        <div className="lg:col-span-2 flex flex-col gap-6 min-h-0 overflow-y-auto pr-1">
+        <section className="rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-4 shrink-0">
             <h2 className="text-xl font-semibold text-gold">Members ({members.length})</h2>
             <Button size="sm" onClick={addMember} disabled={members.length >= 20}><Plus className="h-4 w-4 mr-1" /> Add member</Button>
@@ -242,6 +243,42 @@ function AdminPage() {
             ))}
           </div>
         </section>
+
+        <section className="rounded-2xl border border-border/60 bg-card/80 p-6 shrink-0">
+          <h2 className="text-xl font-semibold text-gold flex items-center gap-2"><History className="h-5 w-5" /> Past Winners</h2>
+          <p className="text-xs text-muted-foreground mt-1">Record winners from earlier months so the Hall of Winners shows correct month numbers and proofs.</p>
+          <div className="mt-4 grid sm:grid-cols-2 gap-3">
+            <div><Label>Month</Label><Input type="month" value={pastMonth} onChange={(e) => setPastMonth(e.target.value)} /></div>
+            <div>
+              <Label>Winner</Label>
+              <select value={pastMemberId} onChange={(e) => setPastMemberId(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
+                <option value="">Select member…</option>
+                {members.map((m) => <option key={m.id} value={m.id}>#{m.position} {m.name}</option>)}
+              </select>
+            </div>
+            <div><Label>Proof Image URL (optional)</Label><Input value={pastImageUrl} placeholder="https://…/winner.png" onChange={(e) => setPastImageUrl(e.target.value)} /></div>
+            <div><Label>Spin Video URL (optional)</Label><Input value={pastVideoUrl} placeholder="https://…/spin.webm" onChange={(e) => setPastVideoUrl(e.target.value)} /></div>
+          </div>
+          <Button onClick={addPastWinner} disabled={addingPast} className="mt-4 bg-gold text-primary-foreground font-semibold">
+            <Plus className="h-4 w-4 mr-1" /> {addingPast ? "Adding…" : "Add past winner"}
+          </Button>
+
+          <div className="mt-5 space-y-2">
+            {winners.length === 0 && <p className="text-sm text-muted-foreground">No winner history yet.</p>}
+            {winners.map((w) => (
+              <div key={w.id} className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/30 p-3">
+                <div className="text-xs uppercase tracking-widest text-muted-foreground w-40 shrink-0">
+                  {ordinal(monthNumber(settings.start_month, w.month_year))} Month · {monthKeyLabel(w.month_year)}
+                </div>
+                <div className="flex-1 min-w-0 truncate font-semibold">{w.member_name}</div>
+                {w.image_url && <a href={w.image_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Image</a>}
+                {w.video_url && <a href={w.video_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Video</a>}
+                <Button size="icon" variant="ghost" onClick={() => deleteWinner(w)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+              </div>
+            ))}
+          </div>
+        </section>
+        </div>
       </div>
       <footer className="border-t border-border/60 bg-card/40 shrink-0"><div className="max-w-6xl mx-auto px-6 h-10 flex items-center justify-center text-xs text-muted-foreground">© {new Date().getFullYear()} • Developed with <span className="text-destructive mx-1">♥</span> by <span className="ml-1 font-semibold text-foreground">Dexorzo Creations</span></div></footer>
     </div>
