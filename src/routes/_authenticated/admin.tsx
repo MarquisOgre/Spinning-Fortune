@@ -6,8 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { fetchMembers, fetchSettings, type FontFamily, type Member, type Settings } from "@/lib/lottery";
-import { ArrowLeft, Save, Trash2, Plus, LogOut, RotateCcw, Sun, Moon } from "lucide-react";
+import {
+  fetchMembers,
+  fetchSettings,
+  fetchWinners,
+  monthKeyLabel,
+  monthNumber,
+  ordinal,
+  currentMonthKey,
+  type FontFamily,
+  type Member,
+  type Settings,
+  type Winner,
+} from "@/lib/lottery";
+import { ArrowLeft, Save, Trash2, Plus, LogOut, RotateCcw, Sun, Moon, History } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -31,13 +43,61 @@ function AdminPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [winners, setWinners] = useState<Winner[]>([]);
+  const [pastMonth, setPastMonth] = useState(currentMonthKey());
+  const [pastMemberId, setPastMemberId] = useState("");
+  const [pastImageUrl, setPastImageUrl] = useState("");
+  const [pastVideoUrl, setPastVideoUrl] = useState("");
+  const [addingPast, setAddingPast] = useState(false);
 
   const reload = async () => {
-    const [m, s] = await Promise.all([fetchMembers(), fetchSettings()]);
+    const [m, s, w] = await Promise.all([fetchMembers(), fetchSettings(), fetchWinners()]);
     setMembers(m);
     setSettings(s);
+    setWinners(w);
     setLoading(false);
     document.documentElement.dataset.font = s.font_family;
+  };
+
+  const addPastWinner = async () => {
+    const member = members.find((m) => m.id === pastMemberId);
+    if (!member) return toast.error("Pick a member");
+    if (!/^\d{4}-\d{2}$/.test(pastMonth)) return toast.error("Pick a valid month");
+    if (winners.some((w) => w.month_year === pastMonth)) return toast.error("A winner already exists for that month");
+    setAddingPast(true);
+    const { error } = await supabase.from("winners").insert({
+      member_id: member.id,
+      member_name: member.name,
+      month_year: pastMonth,
+      image_url: pastImageUrl.trim() || null,
+      video_url: pastVideoUrl.trim() || null,
+      spun_at: new Date(`${pastMonth}-01T12:00:00Z`).toISOString(),
+    });
+    if (error) { setAddingPast(false); return toast.error(error.message); }
+    const { error: mErr } = await supabase
+      .from("members")
+      .update({ is_winner: true, status: "used", won_month: pastMonth, won_at: new Date(`${pastMonth}-01T12:00:00Z`).toISOString() })
+      .eq("id", member.id);
+    if (mErr) toast.error(mErr.message);
+    setAddingPast(false);
+    setPastMemberId("");
+    setPastImageUrl("");
+    setPastVideoUrl("");
+    toast.success(`Recorded ${member.name} for ${monthKeyLabel(pastMonth)}`);
+    reload();
+  };
+
+  const deleteWinner = async (w: Winner) => {
+    const { error } = await supabase.from("winners").delete().eq("id", w.id);
+    if (error) return toast.error(error.message);
+    if (w.member_id) {
+      await supabase
+        .from("members")
+        .update({ is_winner: false, status: "active", won_month: null, won_at: null })
+        .eq("id", w.member_id);
+    }
+    toast.success("Winner entry removed");
+    reload();
   };
 
   useEffect(() => { reload(); }, []);
