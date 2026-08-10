@@ -46,9 +46,19 @@ function AdminPage() {
   const [winners, setWinners] = useState<Winner[]>([]);
   const [pastMonth, setPastMonth] = useState(currentMonthKey());
   const [pastMemberId, setPastMemberId] = useState("");
-  const [pastImageUrl, setPastImageUrl] = useState("");
-  const [pastVideoUrl, setPastVideoUrl] = useState("");
+  const [pastImageFile, setPastImageFile] = useState<File | null>(null);
+  const [pastVideoFile, setPastVideoFile] = useState<File | null>(null);
   const [addingPast, setAddingPast] = useState(false);
+
+  const uploadProof = async (file: File, month: string, kind: "image" | "video") => {
+    const ext = file.name.split(".").pop()?.toLowerCase() || (kind === "image" ? "png" : "webm");
+    const path = `${month}/${kind}-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("winner-proofs").upload(path, file, { upsert: true, contentType: file.type || undefined });
+    if (error) throw error;
+    const { data, error: sErr } = await supabase.storage.from("winner-proofs").createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
+    if (sErr) throw sErr;
+    return data.signedUrl;
+  };
 
   const reload = async () => {
     const [m, s, w] = await Promise.all([fetchMembers(), fetchSettings(), fetchWinners()]);
@@ -65,12 +75,21 @@ function AdminPage() {
     if (!/^\d{4}-\d{2}$/.test(pastMonth)) return toast.error("Pick a valid month");
     if (winners.some((w) => w.month_year === pastMonth)) return toast.error("A winner already exists for that month");
     setAddingPast(true);
+    let imageUrl: string | null = null;
+    let videoUrl: string | null = null;
+    try {
+      if (pastImageFile) imageUrl = await uploadProof(pastImageFile, pastMonth, "image");
+      if (pastVideoFile) videoUrl = await uploadProof(pastVideoFile, pastMonth, "video");
+    } catch (e) {
+      setAddingPast(false);
+      return toast.error(e instanceof Error ? e.message : "Upload failed");
+    }
     const { error } = await supabase.from("winners").insert({
       member_id: member.id,
       member_name: member.name,
       month_year: pastMonth,
-      image_url: pastImageUrl.trim() || null,
-      video_url: pastVideoUrl.trim() || null,
+      image_url: imageUrl,
+      video_url: videoUrl,
       spun_at: new Date(`${pastMonth}-01T12:00:00Z`).toISOString(),
     });
     if (error) { setAddingPast(false); return toast.error(error.message); }
@@ -81,8 +100,8 @@ function AdminPage() {
     if (mErr) toast.error(mErr.message);
     setAddingPast(false);
     setPastMemberId("");
-    setPastImageUrl("");
-    setPastVideoUrl("");
+    setPastImageFile(null);
+    setPastVideoFile(null);
     toast.success(`Recorded ${member.name} for ${monthKeyLabel(pastMonth)}`);
     reload();
   };
@@ -256,8 +275,16 @@ function AdminPage() {
                 {members.map((m) => <option key={m.id} value={m.id}>#{m.position} {m.name}</option>)}
               </select>
             </div>
-            <div><Label>Proof Image URL (optional)</Label><Input value={pastImageUrl} placeholder="https://…/winner.png" onChange={(e) => setPastImageUrl(e.target.value)} /></div>
-            <div><Label>Spin Video URL (optional)</Label><Input value={pastVideoUrl} placeholder="https://…/spin.webm" onChange={(e) => setPastVideoUrl(e.target.value)} /></div>
+            <div>
+              <Label>Proof Image (optional)</Label>
+              <Input type="file" accept="image/*" onChange={(e) => setPastImageFile(e.target.files?.[0] ?? null)} className="cursor-pointer" />
+              {pastImageFile && <p className="text-xs text-muted-foreground mt-1 truncate">{pastImageFile.name}</p>}
+            </div>
+            <div>
+              <Label>Spin Video (optional)</Label>
+              <Input type="file" accept="video/*" onChange={(e) => setPastVideoFile(e.target.files?.[0] ?? null)} className="cursor-pointer" />
+              {pastVideoFile && <p className="text-xs text-muted-foreground mt-1 truncate">{pastVideoFile.name}</p>}
+            </div>
           </div>
           <Button onClick={addPastWinner} disabled={addingPast} className="mt-4 bg-gold text-primary-foreground font-semibold">
             <Plus className="h-4 w-4 mr-1" /> {addingPast ? "Adding…" : "Add past winner"}

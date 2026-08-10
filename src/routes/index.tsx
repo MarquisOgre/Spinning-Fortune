@@ -377,7 +377,7 @@ function Index() {
           </p>
           <ol className="space-y-2 overflow-y-auto pr-2 flex-1 min-h-0">
             {displayMembers.map((m) => {
-              const isUsed = m.is_winner || m.status === "used";
+              const isUsed = m.is_winner && !!m.won_month;
               const isInactive = m.status === "inactive";
               return (
                 <li
