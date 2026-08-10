@@ -19,8 +19,9 @@ import {
   type Settings,
   type Winner,
 } from "@/lib/lottery";
-import { ArrowLeft, Save, Trash2, Plus, LogOut, RotateCcw, Sun, Moon, History } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Plus, LogOut, RotateCcw, Sun, Moon, History, Video } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
+import { generateSpinVideo } from "@/lib/spin-video";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -49,6 +50,7 @@ function AdminPage() {
   const [pastImageFile, setPastImageFile] = useState<File | null>(null);
   const [pastVideoFile, setPastVideoFile] = useState<File | null>(null);
   const [addingPast, setAddingPast] = useState(false);
+  const [makingVideoId, setMakingVideoId] = useState<string | null>(null);
 
   const uploadProof = async (file: File, month: string, kind: "image" | "video") => {
     const ext = file.name.split(".").pop()?.toLowerCase() || (kind === "image" ? "png" : "webm");
@@ -58,6 +60,33 @@ function AdminPage() {
     const { data, error: sErr } = await supabase.storage.from("winner-proofs").createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
     if (sErr) throw sErr;
     return data.signedUrl;
+  };
+
+  /** Past winners have no recording, so render one (welcome → spin → winner). */
+  const buildSpinVideo = async (w: Winner) => {
+    if (!settings) return;
+    setMakingVideoId(w.id);
+    try {
+      const blob = await generateSpinVideo({
+        title: settings.lottery_title,
+        monthLabel: monthKeyLabel(w.month_year),
+        monthNumberLabel: `${ordinal(monthNumber(settings.start_month, w.month_year))} Month`,
+        prize: settings.prize_amount,
+        members,
+        winners,
+        winnerName: w.member_name,
+      });
+      if (!blob) throw new Error("Video recording is not supported in this browser");
+      const url = await uploadProof(new File([blob], "spin.webm", { type: "video/webm" }), w.month_year, "video");
+      const { error } = await supabase.from("winners").update({ video_url: url }).eq("id", w.id);
+      if (error) throw error;
+      toast.success(`Spin video created for ${monthKeyLabel(w.month_year)}`);
+      reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not create spin video");
+    } finally {
+      setMakingVideoId(null);
+    }
   };
 
   const reload = async () => {
@@ -300,6 +329,11 @@ function AdminPage() {
                 <div className="flex-1 min-w-0 truncate font-semibold">{w.member_name}</div>
                 {w.image_url && <a href={w.image_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Image</a>}
                 {w.video_url && <a href={w.video_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Video</a>}
+                {!w.video_url && (
+                  <Button size="sm" variant="outline" onClick={() => buildSpinVideo(w)} disabled={makingVideoId === w.id}>
+                    <Video className="h-3.5 w-3.5 mr-1" /> {makingVideoId === w.id ? "Recording…" : "Create spin video"}
+                  </Button>
+                )}
                 <Button size="icon" variant="ghost" onClick={() => deleteWinner(w)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
               </div>
             ))}
