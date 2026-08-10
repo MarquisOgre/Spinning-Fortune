@@ -6,8 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { fetchMembers, fetchSettings, type FontFamily, type Member, type Settings } from "@/lib/lottery";
-import { ArrowLeft, Save, Trash2, Plus, LogOut, RotateCcw, Sun, Moon } from "lucide-react";
+import {
+  fetchMembers,
+  fetchSettings,
+  fetchWinners,
+  monthKeyLabel,
+  monthNumber,
+  ordinal,
+  currentMonthKey,
+  type FontFamily,
+  type Member,
+  type Settings,
+  type Winner,
+} from "@/lib/lottery";
+import { ArrowLeft, Save, Trash2, Plus, LogOut, RotateCcw, Sun, Moon, History } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -31,13 +43,61 @@ function AdminPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [winners, setWinners] = useState<Winner[]>([]);
+  const [pastMonth, setPastMonth] = useState(currentMonthKey());
+  const [pastMemberId, setPastMemberId] = useState("");
+  const [pastImageUrl, setPastImageUrl] = useState("");
+  const [pastVideoUrl, setPastVideoUrl] = useState("");
+  const [addingPast, setAddingPast] = useState(false);
 
   const reload = async () => {
-    const [m, s] = await Promise.all([fetchMembers(), fetchSettings()]);
+    const [m, s, w] = await Promise.all([fetchMembers(), fetchSettings(), fetchWinners()]);
     setMembers(m);
     setSettings(s);
+    setWinners(w);
     setLoading(false);
     document.documentElement.dataset.font = s.font_family;
+  };
+
+  const addPastWinner = async () => {
+    const member = members.find((m) => m.id === pastMemberId);
+    if (!member) return toast.error("Pick a member");
+    if (!/^\d{4}-\d{2}$/.test(pastMonth)) return toast.error("Pick a valid month");
+    if (winners.some((w) => w.month_year === pastMonth)) return toast.error("A winner already exists for that month");
+    setAddingPast(true);
+    const { error } = await supabase.from("winners").insert({
+      member_id: member.id,
+      member_name: member.name,
+      month_year: pastMonth,
+      image_url: pastImageUrl.trim() || null,
+      video_url: pastVideoUrl.trim() || null,
+      spun_at: new Date(`${pastMonth}-01T12:00:00Z`).toISOString(),
+    });
+    if (error) { setAddingPast(false); return toast.error(error.message); }
+    const { error: mErr } = await supabase
+      .from("members")
+      .update({ is_winner: true, status: "used", won_month: pastMonth, won_at: new Date(`${pastMonth}-01T12:00:00Z`).toISOString() })
+      .eq("id", member.id);
+    if (mErr) toast.error(mErr.message);
+    setAddingPast(false);
+    setPastMemberId("");
+    setPastImageUrl("");
+    setPastVideoUrl("");
+    toast.success(`Recorded ${member.name} for ${monthKeyLabel(pastMonth)}`);
+    reload();
+  };
+
+  const deleteWinner = async (w: Winner) => {
+    const { error } = await supabase.from("winners").delete().eq("id", w.id);
+    if (error) return toast.error(error.message);
+    if (w.member_id) {
+      await supabase
+        .from("members")
+        .update({ is_winner: false, status: "active", won_month: null, won_at: null })
+        .eq("id", w.member_id);
+    }
+    toast.success("Winner entry removed");
+    reload();
   };
 
   useEffect(() => { reload(); }, []);
@@ -89,6 +149,7 @@ function AdminPage() {
       favicon_url: settings.favicon_url,
       winning_popup_days: settings.winning_popup_days,
       font_family: settings.font_family,
+      start_month: settings.start_month,
     }).eq("id", 1);
     if (sErr) { toast.error(sErr.message); setSaving(false); return; }
     for (const m of members) {
@@ -136,6 +197,7 @@ function AdminPage() {
             <div><Label>Lottery Title</Label><Input value={settings.lottery_title} onChange={(e) => setSettings({ ...settings, lottery_title: e.target.value })} /></div>
             <div><Label>Prize Amount</Label><Input value={settings.prize_amount ?? ""} placeholder="e.g. ₹50,000" onChange={(e) => setSettings({ ...settings, prize_amount: e.target.value })} /></div>
             <div><Label>Spin Day of Month (1–28)</Label><Input type="number" min={1} max={28} value={settings.spin_day} onChange={(e) => setSettings({ ...settings, spin_day: Math.max(1, Math.min(28, Number(e.target.value) || 1)) })} /><p className="text-xs text-muted-foreground mt-1">The wheel unlocks only on this date each month.</p></div>
+            <div><Label>Cycle Start Month</Label><Input type="month" value={settings.start_month} onChange={(e) => setSettings({ ...settings, start_month: e.target.value })} /><p className="text-xs text-muted-foreground mt-1">Month numbers in popups and the Hall of Winners are counted from here.</p></div>
             <div><Label>Winner Popup Days</Label><Input type="number" min={0} max={31} value={settings.winning_popup_days} onChange={(e) => setSettings({ ...settings, winning_popup_days: Math.max(0, Math.min(31, Number(e.target.value) || 0)) })} /><p className="text-xs text-muted-foreground mt-1">How many days the winner popup stays visible after a draw.</p></div>
             <div>
               <Label>App Font</Label>
@@ -160,7 +222,8 @@ function AdminPage() {
           </div>
         </section>
 
-        <section className="lg:col-span-2 rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col min-h-0">
+        <div className="lg:col-span-2 flex flex-col gap-6 min-h-0 overflow-y-auto pr-1">
+        <section className="rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-4 shrink-0">
             <h2 className="text-xl font-semibold text-gold">Members ({members.length})</h2>
             <Button size="sm" onClick={addMember} disabled={members.length >= 20}><Plus className="h-4 w-4 mr-1" /> Add member</Button>
@@ -180,6 +243,42 @@ function AdminPage() {
             ))}
           </div>
         </section>
+
+        <section className="rounded-2xl border border-border/60 bg-card/80 p-6 shrink-0">
+          <h2 className="text-xl font-semibold text-gold flex items-center gap-2"><History className="h-5 w-5" /> Past Winners</h2>
+          <p className="text-xs text-muted-foreground mt-1">Record winners from earlier months so the Hall of Winners shows correct month numbers and proofs.</p>
+          <div className="mt-4 grid sm:grid-cols-2 gap-3">
+            <div><Label>Month</Label><Input type="month" value={pastMonth} onChange={(e) => setPastMonth(e.target.value)} /></div>
+            <div>
+              <Label>Winner</Label>
+              <select value={pastMemberId} onChange={(e) => setPastMemberId(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
+                <option value="">Select member…</option>
+                {members.map((m) => <option key={m.id} value={m.id}>#{m.position} {m.name}</option>)}
+              </select>
+            </div>
+            <div><Label>Proof Image URL (optional)</Label><Input value={pastImageUrl} placeholder="https://…/winner.png" onChange={(e) => setPastImageUrl(e.target.value)} /></div>
+            <div><Label>Spin Video URL (optional)</Label><Input value={pastVideoUrl} placeholder="https://…/spin.webm" onChange={(e) => setPastVideoUrl(e.target.value)} /></div>
+          </div>
+          <Button onClick={addPastWinner} disabled={addingPast} className="mt-4 bg-gold text-primary-foreground font-semibold">
+            <Plus className="h-4 w-4 mr-1" /> {addingPast ? "Adding…" : "Add past winner"}
+          </Button>
+
+          <div className="mt-5 space-y-2">
+            {winners.length === 0 && <p className="text-sm text-muted-foreground">No winner history yet.</p>}
+            {winners.map((w) => (
+              <div key={w.id} className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/30 p-3">
+                <div className="text-xs uppercase tracking-widest text-muted-foreground w-40 shrink-0">
+                  {ordinal(monthNumber(settings.start_month, w.month_year))} Month · {monthKeyLabel(w.month_year)}
+                </div>
+                <div className="flex-1 min-w-0 truncate font-semibold">{w.member_name}</div>
+                {w.image_url && <a href={w.image_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Image</a>}
+                {w.video_url && <a href={w.video_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Video</a>}
+                <Button size="icon" variant="ghost" onClick={() => deleteWinner(w)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+              </div>
+            ))}
+          </div>
+        </section>
+        </div>
       </div>
       <footer className="border-t border-border/60 bg-card/40 shrink-0"><div className="max-w-6xl mx-auto px-6 h-10 flex items-center justify-center text-xs text-muted-foreground">© {new Date().getFullYear()} • Developed with <span className="text-destructive mx-1">♥</span> by <span className="ml-1 font-semibold text-foreground">Dexorzo Creations</span></div></footer>
     </div>

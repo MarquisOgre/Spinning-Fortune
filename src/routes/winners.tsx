@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Download, Share2, Trophy, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { fetchSettings, fetchWinners, buildWhatsappShareText, whatsappShareUrl, type Winner } from "@/lib/lottery";
+import { fetchSettings, fetchWinners, buildWhatsappShareText, whatsappShareUrl, monthNumber, ordinal, type Winner } from "@/lib/lottery";
 import { useTheme } from "@/hooks/use-theme";
 import { renderWinnerImage } from "@/lib/winner-card";
 
@@ -89,6 +89,7 @@ function WinnerTile({ winner, settings }: { winner: Winner; settings: Awaited<Re
     const [y, m] = winner.month_year.split("-");
     return new Date(Number(y), Number(m) - 1, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
   }, [winner.month_year]);
+  const monthNo = ordinal(monthNumber(settings?.start_month, winner.month_year));
 
   useEffect(() => {
     let active = true;
@@ -108,15 +109,15 @@ function WinnerTile({ winner, settings }: { winner: Winner; settings: Awaited<Re
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card/80 p-5">
-      <div className="text-xs uppercase tracking-widest text-muted-foreground">{monthLabel}</div>
+      <div className="text-xs uppercase tracking-widest text-muted-foreground">{monthNo} Month · {monthLabel}</div>
       <div className="mt-1 text-2xl font-serif text-gold">{winner.member_name}</div>
       <div className="mt-4 flex flex-wrap gap-2">
         <a href={waHref} target="_blank" rel="noopener noreferrer"
            className="inline-flex items-center gap-1.5 rounded-full bg-whatsapp text-whatsapp-foreground text-xs px-3 py-1.5 font-semibold hover:brightness-110">
           <Share2 className="h-3.5 w-3.5" /> WhatsApp
         </a>
-        {imgUrl && (
-          <a href={imgUrl} download={`winner-${winner.month_year}.png`}
+        {(winner.image_url || imgUrl) && (
+          <a href={winner.image_url ?? imgUrl!} download={`winner-${winner.month_year}.png`}
              className="inline-flex items-center gap-1.5 rounded-full bg-secondary text-secondary-foreground text-xs px-3 py-1.5 font-semibold hover:brightness-110">
             <Download className="h-3.5 w-3.5" /> Proof
           </a>
