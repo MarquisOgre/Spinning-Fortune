@@ -109,6 +109,18 @@ function AdminPage() {
     try {
       if (pastImageFile) imageUrl = await uploadProof(pastImageFile, pastMonth, "image");
       if (pastVideoFile) videoUrl = await uploadProof(pastVideoFile, pastMonth, "video");
+      if (!videoUrl) {
+        const blob = await generateSpinVideo({
+          title: settings?.lottery_title ?? "Lucky Draw",
+          monthLabel: monthKeyLabel(pastMonth),
+          monthNumberLabel: settings ? `${ordinal(monthNumber(settings.start_month, pastMonth))} Month` : null,
+          prize: settings?.prize_amount ?? null,
+          members,
+          winners,
+          winnerName: member.name,
+        });
+        if (blob) videoUrl = await uploadProof(new File([blob], "spin.webm", { type: "video/webm" }), pastMonth, "video");
+      }
     } catch (e) {
       setAddingPast(false);
       return toast.error(e instanceof Error ? e.message : "Upload failed");
