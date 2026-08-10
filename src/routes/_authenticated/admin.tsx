@@ -149,6 +149,7 @@ function AdminPage() {
       favicon_url: settings.favicon_url,
       winning_popup_days: settings.winning_popup_days,
       font_family: settings.font_family,
+      start_month: settings.start_month,
     }).eq("id", 1);
     if (sErr) { toast.error(sErr.message); setSaving(false); return; }
     for (const m of members) {
@@ -196,6 +197,7 @@ function AdminPage() {
             <div><Label>Lottery Title</Label><Input value={settings.lottery_title} onChange={(e) => setSettings({ ...settings, lottery_title: e.target.value })} /></div>
             <div><Label>Prize Amount</Label><Input value={settings.prize_amount ?? ""} placeholder="e.g. ₹50,000" onChange={(e) => setSettings({ ...settings, prize_amount: e.target.value })} /></div>
             <div><Label>Spin Day of Month (1–28)</Label><Input type="number" min={1} max={28} value={settings.spin_day} onChange={(e) => setSettings({ ...settings, spin_day: Math.max(1, Math.min(28, Number(e.target.value) || 1)) })} /><p className="text-xs text-muted-foreground mt-1">The wheel unlocks only on this date each month.</p></div>
+            <div><Label>Cycle Start Month</Label><Input type="month" value={settings.start_month} onChange={(e) => setSettings({ ...settings, start_month: e.target.value })} /><p className="text-xs text-muted-foreground mt-1">Month numbers in popups and the Hall of Winners are counted from here.</p></div>
             <div><Label>Winner Popup Days</Label><Input type="number" min={0} max={31} value={settings.winning_popup_days} onChange={(e) => setSettings({ ...settings, winning_popup_days: Math.max(0, Math.min(31, Number(e.target.value) || 0)) })} /><p className="text-xs text-muted-foreground mt-1">How many days the winner popup stays visible after a draw.</p></div>
             <div>
               <Label>App Font</Label>
