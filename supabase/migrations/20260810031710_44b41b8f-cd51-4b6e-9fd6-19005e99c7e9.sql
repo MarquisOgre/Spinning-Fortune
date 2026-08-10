@@ -1,0 +1,3 @@
+CREATE POLICY "Admins manage winner proofs" ON storage.objects FOR ALL TO authenticated USING (bucket_id = 'winner-proofs' AND public.has_role(auth.uid(), 'admin'::public.app_role)) WITH CHECK (bucket_id = 'winner-proofs' AND public.has_role(auth.uid(), 'admin'::public.app_role));
+
+UPDATE public.members m SET status = 'active', is_winner = false, won_month = NULL, won_at = NULL WHERE (m.status = 'used' OR m.is_winner = true) AND NOT EXISTS (SELECT 1 FROM public.winners w WHERE w.member_id = m.id);
