@@ -133,25 +133,41 @@ export async function shareWinner(opts: {
   waHref: string;
   monthKey: string;
 }): Promise<"shared" | "fallback" | "failed"> {
-  const files: File[] = [];
+  let imageFile: File | null = null;
+  let videoFile: File | null = null;
   try {
-    if (opts.imageUrl) files.push(await urlToFile(opts.imageUrl, `winner-${opts.monthKey}.png`, "image/png"));
+    if (opts.imageUrl) imageFile = await urlToFile(opts.imageUrl, `winner-${opts.monthKey}.png`, "image/png");
     if (opts.videoUrl)
-      files.push(
-        await urlToFile(opts.videoUrl, `spin-${opts.monthKey}.${videoExtFromUrl(opts.videoUrl)}`, "video/mp4"),
+      videoFile = await urlToFile(
+        opts.videoUrl,
+        `spin-${opts.monthKey}.${videoExtFromUrl(opts.videoUrl)}`,
+        "video/mp4",
       );
   } catch {
     /* ignore */
   }
 
   const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
-  if (files.length && nav.canShare?.({ files }) ) {
+  const tryShare = async (data: ShareData) => {
+    if (!nav.canShare?.(data)) return false;
     try {
-      await navigator.share({ files, text: opts.text });
-      return "shared";
+      await navigator.share(data);
+      return true;
     } catch {
-      /* user cancelled or unsupported → fall through */
+      return false;
     }
+  };
+
+  const both = [imageFile, videoFile].filter(Boolean) as File[];
+  // 1) both attachments in one share sheet
+  if (both.length > 1 && (await tryShare({ files: both, text: opts.text }))) return "shared";
+  // 2) some platforms (incl. WhatsApp) accept only one file per share → send sequentially
+  if (both.length) {
+    let sentAny = false;
+    if (imageFile && (await tryShare({ files: [imageFile], text: opts.text }))) sentAny = true;
+    if (videoFile && (await tryShare({ files: [videoFile], text: sentAny ? undefined : opts.text })))
+      sentAny = true;
+    if (sentAny) return "shared";
   }
 
   try {
