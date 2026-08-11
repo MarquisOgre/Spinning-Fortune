@@ -1,6 +1,7 @@
 import { drawWelcomeCard, drawWinnerCard } from "./winner-card";
 import { drawStage } from "./scene";
 import type { Member, Winner } from "./lottery";
+import { baseMime, pickVideoMime } from "./video-format";
 
 const PALETTE = [
   "#b8894a", "#d4a76a", "#7a5c3a", "#a67856", "#c9a961", "#8f6f4f",
@@ -136,15 +137,16 @@ export function generateSpinVideo(input: SpinVideoInput): Promise<Blob | null> {
 
     const chunks: Blob[] = [];
     const stream = compose.captureStream(30);
+    const mime = pickVideoMime();
     let rec: MediaRecorder;
     try {
-      rec = new MediaRecorder(stream, { mimeType: "video/webm" });
+      rec = new MediaRecorder(stream, { mimeType: mime });
     } catch {
       return resolve(null);
     }
     rec.ondataavailable = (e) => e.data.size > 0 && chunks.push(e.data);
     rec.onstop = () => {
-      const blob = new Blob(chunks, { type: "video/webm" });
+      const blob = new Blob(chunks, { type: baseMime(mime) });
       resolve(blob.size > 0 ? blob : null);
     };
     rec.start();
