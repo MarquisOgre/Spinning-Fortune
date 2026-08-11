@@ -1,0 +1,1 @@
+UPDATE public.settings SET whatsapp_group_link = 'https://chat.whatsapp.com/DLrXdAjUDxqLlBWuEyietj?s=sw&p=a&mlu=0&ilr=4' WHERE id = 1;
