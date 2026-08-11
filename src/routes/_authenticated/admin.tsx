@@ -22,6 +22,7 @@ import {
 import { ArrowLeft, Save, Trash2, Plus, LogOut, RotateCcw, Sun, Moon, History, Video } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { generateSpinVideo } from "@/lib/spin-video";
+import { videoExt } from "@/lib/video-format";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -53,7 +54,7 @@ function AdminPage() {
   const [makingVideoId, setMakingVideoId] = useState<string | null>(null);
 
   const uploadProof = async (file: File, month: string, kind: "image" | "video") => {
-    const ext = file.name.split(".").pop()?.toLowerCase() || (kind === "image" ? "png" : "webm");
+    const ext = file.name.split(".").pop()?.toLowerCase() || (kind === "image" ? "png" : "mp4");
     const path = `${month}/${kind}-${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("winner-proofs").upload(path, file, { upsert: true, contentType: file.type || undefined });
     if (error) throw error;
@@ -67,17 +68,20 @@ function AdminPage() {
     if (!settings) return;
     setMakingVideoId(w.id);
     try {
+      // Always read the latest saved settings so prize/title in the video match admin values.
+      const fresh = await fetchSettings();
       const blob = await generateSpinVideo({
-        title: settings.lottery_title,
+        title: fresh.lottery_title,
         monthLabel: monthKeyLabel(w.month_year),
-        monthNumberLabel: `${ordinal(monthNumber(settings.start_month, w.month_year))} Month`,
-        prize: settings.prize_amount,
+        monthNumberLabel: `${ordinal(monthNumber(fresh.start_month, w.month_year))} Month`,
+        prize: fresh.prize_amount,
         members,
         winners,
         winnerName: w.member_name,
       });
       if (!blob) throw new Error("Video recording is not supported in this browser");
-      const url = await uploadProof(new File([blob], "spin.webm", { type: "video/webm" }), w.month_year, "video");
+      const ext = videoExt(blob.type);
+      const url = await uploadProof(new File([blob], `spin.${ext}`, { type: blob.type }), w.month_year, "video");
       const { error } = await supabase.from("winners").update({ video_url: url }).eq("id", w.id);
       if (error) throw error;
       toast.success(`Spin video created for ${monthKeyLabel(w.month_year)}`);
@@ -110,16 +114,22 @@ function AdminPage() {
       if (pastImageFile) imageUrl = await uploadProof(pastImageFile, pastMonth, "image");
       if (pastVideoFile) videoUrl = await uploadProof(pastVideoFile, pastMonth, "video");
       if (!videoUrl) {
+        const fresh = await fetchSettings();
         const blob = await generateSpinVideo({
-          title: settings?.lottery_title ?? "Lucky Draw",
+          title: fresh.lottery_title,
           monthLabel: monthKeyLabel(pastMonth),
-          monthNumberLabel: settings ? `${ordinal(monthNumber(settings.start_month, pastMonth))} Month` : null,
-          prize: settings?.prize_amount ?? null,
+          monthNumberLabel: `${ordinal(monthNumber(fresh.start_month, pastMonth))} Month`,
+          prize: fresh.prize_amount,
           members,
           winners,
           winnerName: member.name,
         });
-        if (blob) videoUrl = await uploadProof(new File([blob], "spin.webm", { type: "video/webm" }), pastMonth, "video");
+        if (blob)
+          videoUrl = await uploadProof(
+            new File([blob], `spin.${videoExt(blob.type)}`, { type: blob.type }),
+            pastMonth,
+            "video",
+          );
       }
     } catch (e) {
       setAddingPast(false);
@@ -341,11 +351,10 @@ function AdminPage() {
                 <div className="flex-1 min-w-0 truncate font-semibold">{w.member_name}</div>
                 {w.image_url && <a href={w.image_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Image</a>}
                 {w.video_url && <a href={w.video_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Video</a>}
-                {!w.video_url && (
-                  <Button size="sm" variant="outline" onClick={() => buildSpinVideo(w)} disabled={makingVideoId === w.id}>
-                    <Video className="h-3.5 w-3.5 mr-1" /> {makingVideoId === w.id ? "Recording…" : "Create spin video"}
-                  </Button>
-                )}
+                <Button size="sm" variant="outline" onClick={() => buildSpinVideo(w)} disabled={makingVideoId === w.id}>
+                  <Video className="h-3.5 w-3.5 mr-1" />
+                  {makingVideoId === w.id ? "Recording…" : w.video_url ? "Regenerate video" : "Create spin video"}
+                </Button>
                 <Button size="icon" variant="ghost" onClick={() => deleteWinner(w)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
               </div>
             ))}

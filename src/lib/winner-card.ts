@@ -1,3 +1,5 @@
+import { videoExtFromUrl } from "./video-format";
+
 export const CREAM = {
   bgFrom: "#faf6ef",
   bgTo: "#e8dcc4",
@@ -134,7 +136,10 @@ export async function shareWinner(opts: {
   const files: File[] = [];
   try {
     if (opts.imageUrl) files.push(await urlToFile(opts.imageUrl, `winner-${opts.monthKey}.png`, "image/png"));
-    if (opts.videoUrl) files.push(await urlToFile(opts.videoUrl, `spin-${opts.monthKey}.webm`, "video/webm"));
+    if (opts.videoUrl)
+      files.push(
+        await urlToFile(opts.videoUrl, `spin-${opts.monthKey}.${videoExtFromUrl(opts.videoUrl)}`, "video/mp4"),
+      );
   } catch {
     /* ignore */
   }
@@ -161,7 +166,7 @@ export async function shareWinner(opts: {
       delivered++;
     }
     if (opts.videoUrl) {
-      triggerDownload(opts.videoUrl, `spin-${opts.monthKey}.webm`);
+      triggerDownload(opts.videoUrl, `spin-${opts.monthKey}.${videoExtFromUrl(opts.videoUrl)}`);
       delivered++;
     }
   } catch {

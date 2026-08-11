@@ -15,6 +15,7 @@ import { SpinningWheel, type WheelHandle } from "@/components/SpinningWheel";
 import { useTheme } from "@/hooks/use-theme";
 import { drawWelcomeCard, drawWinnerCard, renderWinnerImage, renderWinnerImageDataUrl, shareWinner } from "@/lib/winner-card";
 import { drawStage } from "@/lib/scene";
+import { baseMime, pickVideoMime, videoExtFromUrl } from "@/lib/video-format";
 import {
   fetchMembers,
   fetchSettings,
@@ -74,6 +75,7 @@ function Index() {
   const [seenWelcomeId, setSeenWelcomeId] = useState<string | null>(null);
   const [forcedWinnerId, setForcedWinnerId] = useState<string>("random");
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const recMimeRef = useRef<string>("video/mp4");
   const chunksRef = useRef<BlobPart[]>([]);
   const composeRef = useRef<HTMLCanvasElement | null>(null);
   const phaseRef = useRef<{ kind: "welcome" | "wheel" | "winner"; data: any }>({ kind: "welcome", data: null });
@@ -164,7 +166,9 @@ function Index() {
       frame();
 
       const stream = c.captureStream(30);
-      const rec = new MediaRecorder(stream, { mimeType: "video/webm" });
+      const mime = pickVideoMime();
+      recMimeRef.current = mime;
+      const rec = new MediaRecorder(stream, { mimeType: mime });
       chunksRef.current = [];
       rec.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
       rec.start();
@@ -182,7 +186,7 @@ function Index() {
       rafRef.current = null;
       if (!rec) return resolve(null);
       rec.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: "video/webm" });
+        const blob = new Blob(chunksRef.current, { type: baseMime(recMimeRef.current) });
         if (blob.size === 0) return resolve(null);
         resolve(await blobToDataUrl(blob));
       };
@@ -652,7 +656,7 @@ function WinnerDialog({
           )}
           {winner.videoUrl ? (
             <Button asChild variant="outline" className="h-12 rounded-full border-primary/40 bg-primary/10 text-primary sm:col-span-2 font-semibold hover:bg-primary/20">
-              <a href={winner.videoUrl} download={`spin-${winner.monthKey}.webm`}>
+              <a href={winner.videoUrl} download={`spin-${winner.monthKey}.${videoExtFromUrl(winner.videoUrl)}`}>
                 <Download className="h-4 w-4" /> Download spin video
               </a>
             </Button>
