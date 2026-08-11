@@ -15,6 +15,7 @@ import { SpinningWheel, type WheelHandle } from "@/components/SpinningWheel";
 import { useTheme } from "@/hooks/use-theme";
 import { drawWelcomeCard, drawWinnerCard, renderWinnerImage, renderWinnerImageDataUrl, shareWinner } from "@/lib/winner-card";
 import { drawStage } from "@/lib/scene";
+import { baseMime, pickVideoMime, videoExtFromUrl } from "@/lib/video-format";
 import {
   fetchMembers,
   fetchSettings,
