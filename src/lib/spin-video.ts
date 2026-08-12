@@ -24,7 +24,13 @@ function truncate(s: string, n: number) {
 }
 
 /** Standalone copy of the on-screen wheel so videos can be rendered offscreen. */
-function drawWheel(ctx: CanvasRenderingContext2D, size: number, members: Member[], rot: number) {
+function drawWheel(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  members: Member[],
+  rot: number,
+  currentWinnerName?: string,
+) {
   ctx.clearRect(0, 0, size, size);
   const cx = size / 2;
   const cy = size / 2;
@@ -53,7 +59,8 @@ function drawWheel(ctx: CanvasRenderingContext2D, size: number, members: Member[
     const g = ctx.createLinearGradient(0, 0, Math.cos(start + step / 2) * r, Math.sin(start + step / 2) * r);
     g.addColorStop(0, c1);
     g.addColorStop(1, shade(c1, -25));
-    ctx.fillStyle = g;
+    const used = (m.is_winner || m.status === "used") && m.name !== currentWinnerName;
+    ctx.fillStyle = used ? "#3a2f4a" : g;
     ctx.fill();
     ctx.strokeStyle = "rgba(255,255,255,0.15)";
     ctx.lineWidth = 1;
@@ -61,9 +68,10 @@ function drawWheel(ctx: CanvasRenderingContext2D, size: number, members: Member[
     ctx.save();
     ctx.rotate(start + step / 2);
     ctx.textAlign = "right";
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = used ? "#6b6478" : "#fff";
     ctx.font = "600 15px 'Inter', sans-serif";
-    ctx.fillText(truncate(`#${m.position} ${m.name}`, 20), r - 18, 5);
+    const base = `#${m.position} ${m.name}`;
+    ctx.fillText(truncate(used ? `~${base}~` : base, 20), r - 18, 5);
     ctx.restore();
   });
   ctx.restore();
@@ -159,7 +167,7 @@ export function generateSpinVideo(input: SpinVideoInput): Promise<Blob | null> {
       } else if (e < WELCOME + SPIN + HOLD) {
         const p = Math.min((e - WELCOME) / SPIN, 1);
         const eased = 1 - Math.pow(1 - p, 4);
-        drawWheel(wctx, wheelSize, wheelMembers, delta * eased);
+        drawWheel(wctx, wheelSize, wheelMembers, delta * eased, input.winnerName);
         drawStage(ctx, 1200, 630, {
           title: input.title,
           monthLabel: input.monthLabel,
