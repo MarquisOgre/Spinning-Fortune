@@ -379,25 +379,25 @@ function Index() {
           <p className="text-xs text-muted-foreground mb-3 shrink-0">
             {members.length} total • {eligible.length} in the running
           </p>
-          <ol className="space-y-2 overflow-y-auto pr-2 flex-1 min-h-0">
+          <ol className="flex-1 min-h-0 flex flex-col justify-between gap-1 pr-1">
             {displayMembers.map((m) => {
               const isUsed = m.is_winner && !!m.won_month;
               const isInactive = m.status === "inactive";
               return (
                 <li
                   key={m.id}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 transition ${
+                  className={`flex items-center gap-2 rounded-md px-2 py-1 transition ${
                     isUsed ? "bg-primary/10 border border-primary/30"
                     : isInactive ? "bg-muted/40 opacity-60"
                     : "bg-background/70 hover:bg-background"
                   }`}
                 >
-                  <span className="text-xs w-6 text-muted-foreground">{m.position}</span>
-                  <span className={`flex-1 text-sm ${isUsed ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                  <span className="text-[11px] w-5 text-muted-foreground shrink-0">{m.position}</span>
+                  <span className={`flex-1 text-xs truncate ${isUsed ? "line-through text-muted-foreground" : "text-foreground"}`}>
                     {m.name}
                   </span>
-                  {isUsed && <Trophy className="h-3.5 w-3.5 text-primary" />}
-                  {isInactive && <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Inactive</span>}
+                  {isUsed && <Trophy className="h-3 w-3 text-primary shrink-0" />}
+                  {isInactive && <span className="text-[9px] uppercase tracking-wider text-muted-foreground shrink-0">Off</span>}
                 </li>
               );
             })}
