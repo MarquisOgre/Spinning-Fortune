@@ -139,7 +139,7 @@ export const SpinningWheel = forwardRef<WheelHandle, Props>(function SpinningWhe
   }));
 
   return (
-    <div className="relative w-full max-w-[420px] aspect-square">
+    <div className="relative w-full max-w-[min(420px,calc(100vh-380px))] aspect-square mx-auto shrink-0">
       <canvas
         ref={canvasRef}
         className="block w-full h-full drop-shadow-[0_0_40px_color-mix(in_oklab,var(--gold)_35%,transparent)]"
