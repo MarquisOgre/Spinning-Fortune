@@ -65,7 +65,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground"
           >
             Go home
           </a>
@@ -85,7 +85,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: "Lucky Draw — Monthly Lottery" },
       { property: "og:description", content: "Spin the wheel each month. One lucky winner." },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: "https://spinning-fortune.vercel.app/logo.png" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "https://spinning-fortune.vercel.app/logo.png" },
     ],
     links: [
       {
@@ -98,7 +102,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Lora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&family=Sora:wght@500;600;700;800&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.png", type: "image/png" },
+      { rel: "shortcut icon", href: "/favicon.png", type: "image/png" },
     ],
   }),
   shellComponent: RootShell,
@@ -134,21 +139,11 @@ function RootComponent() {
     return () => sub.subscription.unsubscribe();
   }, [router]);
 
-  // Apply dynamic favicon and font from settings, if configured.
+  // Keep the font dynamic from settings, while the favicon is always the bundled PNG.
   useEffect(() => {
-    supabase.from("settings").select("favicon_url,font_family").eq("id", 1).maybeSingle().then(({ data }) => {
-      const url = (data as { favicon_url?: string } | null)?.favicon_url;
+    supabase.from("settings").select("font_family").eq("id", 1).maybeSingle().then(({ data }) => {
       const font = (data as { font_family?: string } | null)?.font_family;
       if (font) document.documentElement.dataset.font = font;
-      if (url) {
-        let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
-        if (!link) {
-          link = document.createElement("link");
-          link.rel = "icon";
-          document.head.appendChild(link);
-        }
-        link.href = url;
-      }
     });
   }, []);
 
