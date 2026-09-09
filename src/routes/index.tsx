@@ -73,7 +73,10 @@ function Index() {
   const [welcomeDialogOpen, setWelcomeDialogOpen] = useState(false);
   const [dismissedWinnerId, setDismissedWinnerId] = useState<string | null>(null);
   const [seenWelcomeId, setSeenWelcomeId] = useState<string | null>(null);
-  const [forcedWinnerId, setForcedWinnerId] = useState<string>("random");
+  const [forcedWinnerId, setForcedWinnerId] = useState<string>(() => {
+    if (typeof window === "undefined") return "random";
+    return window.localStorage.getItem("lucky-draw-forced-winner") ?? "random";
+  });
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recMimeRef = useRef<string>("video/mp4");
   const chunksRef = useRef<BlobPart[]>([]);
@@ -86,6 +89,10 @@ function Index() {
     title: "",
     monthLabel: "",
   });
+
+  useEffect(() => {
+    window.localStorage.setItem("lucky-draw-forced-winner", forcedWinnerId);
+  }, [forcedWinnerId]);
 
   const load = async () => {
     const [m, s, w] = await Promise.all([fetchMembers(), fetchSettings(), fetchWinners()]);
@@ -139,7 +146,6 @@ function Index() {
     };
   }, [members, winners, settings?.lottery_title, monthLabel]);
 
-  // Records a composed canvas: welcome banner → live wheel spin → winner card.
   const startRecording = async () => {
     try {
       const c = document.createElement("canvas");
@@ -201,7 +207,6 @@ function Index() {
     setSeenWelcomeId(null);
     setDismissedWinnerId(null);
 
-    // Pick an index that exists on the wheel (wheelMembers), and only among active/non-winner
     const eligibleWheelIdx = wheelMembers
       .map((m, i) => ({ m, i }))
       .filter(({ m }) => m.status === "active" && !m.is_winner);
@@ -233,7 +238,6 @@ function Index() {
     setVideoUrl(url);
     const imageDataUrl = renderWinnerImageDataUrl(cardBase);
 
-    // Server-side lock: unique index on winners.month_year prevents double-draws.
     const { error: e2 } = await supabase.from("winners").insert({
       member_id: picked.id,
       member_name: picked.name,
@@ -316,7 +320,6 @@ function Index() {
     };
   }, [cycleMonthLabel, monthKey, monthLabel, persistentWinner, settings, shareText, videoUrl, winner]);
 
-  // The welcome banner always comes first; the winner popup opens when it closes.
   useEffect(() => {
     if (!winnerPopup) return;
     if (seenWelcomeId === winnerPopup.recordId) return;
@@ -324,7 +327,6 @@ function Index() {
     setWelcomeDialogOpen(true);
   }, [dismissedWinnerId, seenWelcomeId, winnerPopup]);
 
-  // Keep the wheel parked on the most recent winner (also after a refresh).
   useEffect(() => {
     if (spinning || !latestWinner || !wheelMembers.length) return;
     const idx = wheelMembers.findIndex(
@@ -408,60 +410,42 @@ function Index() {
           <SpinningWheel ref={wheelRef} members={wheelMembers} size={420} />
 
           <div className="mt-4 flex flex-col md:flex-row items-center justify-center gap-4">
-  <h1 className="text-3xl md:text-4xl font-serif text-gold">
-    Spin for {monthLabel} · {cycleMonthLabel}
-  </h1>
+            <h1 className="text-3xl md:text-4xl font-serif text-gold whitespace-nowrap text-center text-[clamp(1.1rem,2vw,2.25rem)]">
+              Spin for {monthLabel} · {cycleMonthLabel}
+            </h1>
 
-  <Button
-    size="lg"
-    onClick={handleSpin}
-    disabled={!canSpin}
-    className="bg-gold text-primary-foreground font-serif text-base px-8 h-12 rounded-full shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-50"
-  >
-    {spinning
-      ? "Spinning…"
-      : alreadySpunThisMonth
-      ? "Already drawn"
-      : !dateOk
-      ? (
-        <>
-          <Lock className="h-4 w-4 mr-2" />
-          Locked
-        </>
-      )
-      : "Spin the Wheel"}
-  </Button>
-</div>
+            <Button
+              size="lg"
+              onClick={handleSpin}
+              disabled={!canSpin}
+              className="bg-gold text-primary-foreground font-serif text-base px-8 h-12 rounded-full shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-50"
+            >
+              {spinning
+                ? "Spinning…"
+                : alreadySpunThisMonth
+                ? "Already drawn"
+                : !dateOk
+                ? (
+                  <>
+                    <Lock className="h-4 w-4 mr-2" />
+                    Locked
+                  </>
+                )
+                : "Spin the Wheel"}
+            </Button>
+          </div>
 
-{settings && (
-  <p className="mt-2 text-center text-sm text-muted-foreground">
-    {alreadySpunThisMonth
-      ? "This month's winner has been drawn."
-      : dateOk
-      ? isAdmin
-        ? "The wheel is unlocked."
-        : "Only the admin can spin today."
-      : `Unlocks on the ${ordinal(settings.spin_day)} of each month.`}
-  </p>
-)}
-
-{isAdmin && !alreadySpunThisMonth && (
-  <div className="mt-3 flex items-center gap-2 text-sm">
-    <label htmlFor="forced-winner" className="text-muted-foreground">Stop at</label>
-    <select
-      id="forced-winner"
-      value={forcedWinnerId}
-      onChange={(e) => setForcedWinnerId(e.target.value)}
-      className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-    >
-      <option value="random">Random member</option>
-      {eligible.map((m) => (
-        <option key={m.id} value={m.id}>{`#${m.position} ${m.name}`}</option>
-      ))}
-    </select>
-  </div>
-)}
-
+          {settings && (
+            <p className="mt-2 text-center text-sm text-muted-foreground">
+              {alreadySpunThisMonth
+                ? "This month's winner has been drawn."
+                : dateOk
+                ? isAdmin
+                  ? "The wheel is unlocked."
+                  : "Only the admin can spin today."
+                : `Unlocks on the ${ordinal(settings.spin_day)} of each month.`}
+            </p>
+          )}
         </main>
 
         <aside className="h-full rounded-2xl border border-border/60 bg-card/80 p-4 flex flex-col min-h-0">
