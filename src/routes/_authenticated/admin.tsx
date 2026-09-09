@@ -300,93 +300,93 @@ function AdminPage() {
         </section>
 
         <div className="lg:col-span-2 flex flex-col gap-6 min-h-0 overflow-y-auto pr-1">
-        <section className="rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col shrink-0 overflow-hidden">
-          <div className="flex items-center justify-between mb-4 shrink-0 rounded-lg border border-border/50 bg-background/30 p-3">
-            <h2 className="text-xl font-semibold text-gold">Members ({members.length})</h2>
-            <Button size="sm" onClick={addMember} disabled={members.length >= 20}><Plus className="h-4 w-4 mr-1" /> Add member</Button>
-          </div>
-          {members.length === 0 && <p className="text-sm text-muted-foreground">No members yet. Add up to 20.</p>}
-          <div className="space-y-2 overflow-y-auto pr-2 max-h-[420px]">
-            {members.map((m) => (
-              <div key={m.id} className="grid grid-cols-[36px_minmax(0,1fr)_160px_112px_36px] items-center gap-2 rounded-xl border border-border/50 bg-background/30 p-3">
-                <div className="w-8 text-center text-primary font-semibold">{m.position}</div>
-                <Input value={m.name} onChange={(e) => updateMember(m.id, { name: e.target.value })} className="min-w-0" />
-                <Input value={m.phone ?? ""} placeholder="Phone" onChange={(e) => updateMember(m.id, { phone: e.target.value })} />
-                <select value={m.status} onChange={(e) => updateMember(m.id, { status: e.target.value as Member["status"] })} className="h-9 text-xs rounded-md border border-input bg-background px-2 py-1.5">
-                  <option value="active">Active</option><option value="inactive">Inactive</option><option value="used">Used</option>
-                </select>
-                <Button size="icon" variant="ghost" onClick={() => deleteMember(m.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shrink-0">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-gold">Spin Control</h2>
-              <p className="text-xs text-muted-foreground mt-1">Choose who the wheel should stop at for the next draw.</p>
+          <section className="rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col flex-none min-h-[140px] overflow-hidden">
+            <div className="flex items-center justify-between mb-4 shrink-0 rounded-lg border border-border/50 bg-background/30 p-3">
+              <h2 className="text-xl font-semibold text-gold">Members ({members.length})</h2>
+              <Button size="sm" onClick={addMember} disabled={members.length >= 20}><Plus className="h-4 w-4 mr-1" /> Add member</Button>
             </div>
-            <select
-              id="admin-forced-winner"
-              value={forcedWinnerId}
-              onChange={(e) => setForcedWinnerId(e.target.value)}
-              className="h-10 min-w-[190px] rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="random">Random member</option>
-              {members.filter((m) => m.status === "active" && !m.is_winner).map((m) => (
-                <option key={m.id} value={m.id}>{`#${m.position} ${m.name}`}</option>
+            {members.length === 0 && <p className="text-sm text-muted-foreground">No members yet. Add up to 20.</p>}
+            <div className="space-y-2 overflow-y-auto pr-2 max-h-[420px] min-h-0">
+              {members.map((m) => (
+                <div key={m.id} className="grid grid-cols-[36px_minmax(0,1fr)_160px_112px_36px] items-center gap-2 rounded-xl border border-border/50 bg-background/30 p-3">
+                  <div className="w-8 text-center text-primary font-semibold">{m.position}</div>
+                  <Input value={m.name} onChange={(e) => updateMember(m.id, { name: e.target.value })} className="min-w-0" />
+                  <Input value={m.phone ?? ""} placeholder="Phone" onChange={(e) => updateMember(m.id, { phone: e.target.value })} />
+                  <select value={m.status} onChange={(e) => updateMember(m.id, { status: e.target.value as Member["status"] })} className="h-9 text-xs rounded-md border border-input bg-background px-2 py-1.5">
+                    <option value="active">Active</option><option value="inactive">Inactive</option><option value="used">Used</option>
+                  </select>
+                  <Button size="icon" variant="ghost" onClick={() => deleteMember(m.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </div>
               ))}
-            </select>
-          </div>
-        </section>
+            </div>
+          </section>
 
-        <section className="rounded-2xl border border-border/60 bg-card/80 p-6 shrink-0">
-          <h2 className="text-xl font-semibold text-gold flex items-center gap-2"><History className="h-5 w-5" /> Past Winners</h2>
-          <p className="text-xs text-muted-foreground mt-1">Record winners from earlier months so the Hall of Winners shows correct month numbers and proofs.</p>
-          <div className="mt-4 grid sm:grid-cols-2 gap-3">
-            <div><Label>Month</Label><Input type="month" value={pastMonth} onChange={(e) => setPastMonth(e.target.value)} /></div>
-            <div>
-              <Label>Winner</Label>
-              <select value={pastMemberId} onChange={(e) => setPastMemberId(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
-                <option value="">Select member…</option>
-                {members.map((m) => <option key={m.id} value={m.id}>#{m.position} {m.name}</option>)}
+          <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shrink-0">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gold">Spin Control</h2>
+                <p className="text-xs text-muted-foreground mt-1">Choose who the wheel should stop at for the next draw.</p>
+              </div>
+              <select
+                id="admin-forced-winner"
+                value={forcedWinnerId}
+                onChange={(e) => setForcedWinnerId(e.target.value)}
+                className="h-10 min-w-[190px] rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="random">Random member</option>
+                {members.filter((m) => m.status === "active" && !m.is_winner).map((m) => (
+                  <option key={m.id} value={m.id}>{`#${m.position} ${m.name}`}</option>
+                ))}
               </select>
             </div>
-            <div>
-              <Label>Proof Image (optional)</Label>
-              <Input type="file" accept="image/*" onChange={(e) => setPastImageFile(e.target.files?.[0] ?? null)} className="cursor-pointer" />
-              {pastImageFile && <p className="text-xs text-muted-foreground mt-1 truncate">{pastImageFile.name}</p>}
-            </div>
-            <div>
-              <Label>Spin Video (optional)</Label>
-              <Input type="file" accept="video/*" onChange={(e) => setPastVideoFile(e.target.files?.[0] ?? null)} className="cursor-pointer" />
-              {pastVideoFile && <p className="text-xs text-muted-foreground mt-1 truncate">{pastVideoFile.name}</p>}
-            </div>
-          </div>
-          <Button onClick={addPastWinner} disabled={addingPast} className="mt-4 bg-gold text-primary-foreground font-semibold">
-            <Plus className="h-4 w-4 mr-1" /> {addingPast ? "Adding…" : "Add past winner"}
-          </Button>
+          </section>
 
-          <div className="mt-5 space-y-2">
-            {winners.length === 0 && <p className="text-sm text-muted-foreground">No winner history yet.</p>}
-            {winners.map((w) => (
-              <div key={w.id} className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/30 p-3">
-                <div className="text-xs uppercase tracking-widest text-muted-foreground w-40 shrink-0">
-                  {ordinal(monthNumber(settings.start_month, w.month_year))} Month · {monthKeyLabel(w.month_year)}
-                </div>
-                <div className="flex-1 min-w-0 truncate font-semibold">{w.member_name}</div>
-                {w.image_url && <a href={w.image_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Image</a>}
-                {w.video_url && <a href={w.video_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Video</a>}
-                <Button size="sm" variant="outline" onClick={() => buildSpinVideo(w)} disabled={makingVideoId === w.id}>
-                  <Video className="h-3.5 w-3.5 mr-1" />
-                  {makingVideoId === w.id ? "Recording…" : w.video_url ? "Regenerate video" : "Create spin video"}
-                </Button>
-                <Button size="icon" variant="ghost" onClick={() => deleteWinner(w)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+          <section className="rounded-2xl border border-border/60 bg-card/80 p-6 shrink-0">
+            <h2 className="text-xl font-semibold text-gold flex items-center gap-2"><History className="h-5 w-5" /> Past Winners</h2>
+            <p className="text-xs text-muted-foreground mt-1">Record winners from earlier months so the Hall of Winners shows correct month numbers and proofs.</p>
+            <div className="mt-4 grid sm:grid-cols-2 gap-3">
+              <div><Label>Month</Label><Input type="month" value={pastMonth} onChange={(e) => setPastMonth(e.target.value)} /></div>
+              <div>
+                <Label>Winner</Label>
+                <select value={pastMemberId} onChange={(e) => setPastMemberId(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
+                  <option value="">Select member…</option>
+                  {members.map((m) => <option key={m.id} value={m.id}>#{m.position} {m.name}</option>)}
+                </select>
               </div>
-            ))}
-          </div>
-        </section>
+              <div>
+                <Label>Proof Image (optional)</Label>
+                <Input type="file" accept="image/*" onChange={(e) => setPastImageFile(e.target.files?.[0] ?? null)} className="cursor-pointer" />
+                {pastImageFile && <p className="text-xs text-muted-foreground mt-1 truncate">{pastImageFile.name}</p>}
+              </div>
+              <div>
+                <Label>Spin Video (optional)</Label>
+                <Input type="file" accept="video/*" onChange={(e) => setPastVideoFile(e.target.files?.[0] ?? null)} className="cursor-pointer" />
+                {pastVideoFile && <p className="text-xs text-muted-foreground mt-1 truncate">{pastVideoFile.name}</p>}
+              </div>
+            </div>
+            <Button onClick={addPastWinner} disabled={addingPast} className="mt-4 bg-gold text-primary-foreground font-semibold">
+              <Plus className="h-4 w-4 mr-1" /> {addingPast ? "Adding…" : "Add past winner"}
+            </Button>
+
+            <div className="mt-5 space-y-2">
+              {winners.length === 0 && <p className="text-sm text-muted-foreground">No winner history yet.</p>}
+              {winners.map((w) => (
+                <div key={w.id} className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/30 p-3">
+                  <div className="text-xs uppercase tracking-widest text-muted-foreground w-40 shrink-0">
+                    {ordinal(monthNumber(settings.start_month, w.month_year))} Month · {monthKeyLabel(w.month_year)}
+                  </div>
+                  <div className="flex-1 min-w-0 truncate font-semibold">{w.member_name}</div>
+                  {w.image_url && <a href={w.image_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Image</a>}
+                  {w.video_url && <a href={w.video_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Video</a>}
+                  <Button size="sm" variant="outline" onClick={() => buildSpinVideo(w)} disabled={makingVideoId === w.id}>
+                    <Video className="h-3.5 w-3.5 mr-1" />
+                    {makingVideoId === w.id ? "Recording…" : w.video_url ? "Regenerate video" : "Create spin video"}
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={() => deleteWinner(w)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
       </div>
       <footer className="border-t border-border/60 bg-card/40 shrink-0"><div className="max-w-6xl mx-auto px-6 h-10 flex items-center justify-center text-xs text-muted-foreground">© {new Date().getFullYear()} • Developed with <span className="text-destructive mx-1">♥</span> by <span className="ml-1 font-semibold text-foreground">Dexorzo Creations</span></div></footer>
