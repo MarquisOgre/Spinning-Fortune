@@ -139,23 +139,50 @@ export const SpinningWheel = forwardRef<WheelHandle, Props>(function SpinningWhe
   }));
 
   return (
-    <div className="relative w-full max-w-[min(420px,calc(100vh-380px))] aspect-square mx-auto shrink-0">
-      <canvas
-        ref={canvasRef}
-        className="block w-full h-full drop-shadow-[0_0_40px_color-mix(in_oklab,var(--gold)_35%,transparent)]"
-      />
-      <div
-        className="absolute left-1/2 -translate-x-1/2 top-0 z-10 pointer-events-none"
-        style={{
-          width: 0,
-          height: 0,
-          borderLeft: "18px solid transparent",
-          borderRight: "18px solid transparent",
-          borderTop: "34px solid #f5c34a",
-          filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.5))",
-        }}
-      />
-    </div>
+    <>
+      <style>{`
+        main:has(.spinning-wheel-root) {
+          justify-content: flex-end !important;
+          overflow: visible !important;
+          padding-bottom: 10px;
+        }
+        main:has(.spinning-wheel-root) > .mt-4 {
+          margin-top: 8px !important;
+        }
+        main:has(.spinning-wheel-root) > .mt-4 h1 {
+          font-size: clamp(1.65rem, 2.8vw, 2.35rem) !important;
+          line-height: 1.05 !important;
+        }
+        main:has(.spinning-wheel-root) > .mt-2 {
+          margin-top: 5px !important;
+        }
+        main:has(.spinning-wheel-root) > .mt-3 {
+          margin-top: 6px !important;
+        }
+        @media (max-height: 700px) {
+          main:has(.spinning-wheel-root) > .mt-4 h1 {
+            font-size: clamp(1.45rem, 2.5vw, 2rem) !important;
+          }
+        }
+      `}</style>
+      <div className="spinning-wheel-root relative w-full max-w-[min(440px,calc(100vh-350px))] aspect-square mx-auto shrink-0">
+        <canvas
+          ref={canvasRef}
+          className="block w-full h-full drop-shadow-[0_0_40px_color-mix(in_oklab,var(--gold)_35%,transparent)]"
+        />
+        <div
+          className="absolute left-1/2 -translate-x-1/2 top-0 z-10 pointer-events-none"
+          style={{
+            width: 0,
+            height: 0,
+            borderLeft: "18px solid transparent",
+            borderRight: "18px solid transparent",
+            borderTop: "34px solid #f5c34a",
+            filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.5))",
+          }}
+        />
+      </div>
+    </>
   );
 });
 
