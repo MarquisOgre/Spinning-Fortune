@@ -52,6 +52,10 @@ function AdminPage() {
   const [pastVideoFile, setPastVideoFile] = useState<File | null>(null);
   const [addingPast, setAddingPast] = useState(false);
   const [makingVideoId, setMakingVideoId] = useState<string | null>(null);
+  const [forcedWinnerId, setForcedWinnerId] = useState<string>(() => {
+    if (typeof window === "undefined") return "random";
+    return window.localStorage.getItem("lucky-draw-forced-winner") ?? "random";
+  });
 
   const uploadProof = async (file: File, month: string, kind: "image" | "video") => {
     const ext = file.name.split(".").pop()?.toLowerCase() || (kind === "image" ? "png" : "mp4");
@@ -68,7 +72,6 @@ function AdminPage() {
     if (!settings) return;
     setMakingVideoId(w.id);
     try {
-      // Always read the latest saved settings so prize/title in the video match admin values.
       const fresh = await fetchSettings();
       const blob = await generateSpinVideo({
         title: fresh.lottery_title,
@@ -171,6 +174,10 @@ function AdminPage() {
   };
 
   useEffect(() => { reload(); }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("lucky-draw-forced-winner", forcedWinnerId);
+  }, [forcedWinnerId]);
 
   const updateMember = (id: string, patch: Partial<Member>) => {
     setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
@@ -293,8 +300,8 @@ function AdminPage() {
         </section>
 
         <div className="lg:col-span-2 flex flex-col gap-6 min-h-0 overflow-y-auto pr-1">
-        <section className="rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col min-h-0">
-          <div className="flex items-center justify-between mb-4 shrink-0">
+        <section className="rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex items-center justify-between mb-4 shrink-0 rounded-lg border border-border/50 bg-background/30 p-3">
             <h2 className="text-xl font-semibold text-gold">Members ({members.length})</h2>
             <Button size="sm" onClick={addMember} disabled={members.length >= 20}><Plus className="h-4 w-4 mr-1" /> Add member</Button>
           </div>
@@ -311,6 +318,26 @@ function AdminPage() {
                 <Button size="icon" variant="ghost" onClick={() => deleteMember(m.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shrink-0">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gold">Spin Control</h2>
+              <p className="text-xs text-muted-foreground mt-1">Choose who the wheel should stop at for the next draw.</p>
+            </div>
+            <select
+              id="admin-forced-winner"
+              value={forcedWinnerId}
+              onChange={(e) => setForcedWinnerId(e.target.value)}
+              className="h-10 min-w-[190px] rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="random">Random member</option>
+              {members.filter((m) => m.status === "active" && !m.is_winner).map((m) => (
+                <option key={m.id} value={m.id}>{`#${m.position} ${m.name}`}</option>
+              ))}
+            </select>
           </div>
         </section>
 
