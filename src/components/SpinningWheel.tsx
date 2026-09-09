@@ -30,10 +30,10 @@ export const SpinningWheel = forwardRef<WheelHandle, Props>(function SpinningWhe
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    canvas.style.width = `${size}px`;
-    canvas.style.height = `${size}px`;
+    canvas.width = Math.round(size * dpr);
+    canvas.height = Math.round(size * dpr);
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size, size);
     const cx = size / 2;
@@ -139,10 +139,13 @@ export const SpinningWheel = forwardRef<WheelHandle, Props>(function SpinningWhe
   }));
 
   return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <canvas ref={canvasRef} className="drop-shadow-[0_0_40px_color-mix(in_oklab,var(--gold)_35%,transparent)]" />
+    <div className="relative w-full max-w-[420px] aspect-square">
+      <canvas
+        ref={canvasRef}
+        className="block w-full h-full drop-shadow-[0_0_40px_color-mix(in_oklab,var(--gold)_35%,transparent)]"
+      />
       <div
-        className="absolute left-1/2 -translate-x-1/2 -top-2 z-10"
+        className="absolute left-1/2 -translate-x-1/2 top-0 z-10 pointer-events-none"
         style={{
           width: 0,
           height: 0,
