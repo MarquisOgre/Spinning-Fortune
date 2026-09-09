@@ -300,13 +300,13 @@ function AdminPage() {
         </section>
 
         <div className="lg:col-span-2 flex flex-col gap-6 min-h-0 overflow-y-auto pr-1">
-        <section className="rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col min-h-0 overflow-hidden">
+        <section className="rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col shrink-0 overflow-hidden">
           <div className="flex items-center justify-between mb-4 shrink-0 rounded-lg border border-border/50 bg-background/30 p-3">
             <h2 className="text-xl font-semibold text-gold">Members ({members.length})</h2>
             <Button size="sm" onClick={addMember} disabled={members.length >= 20}><Plus className="h-4 w-4 mr-1" /> Add member</Button>
           </div>
           {members.length === 0 && <p className="text-sm text-muted-foreground">No members yet. Add up to 20.</p>}
-          <div className="space-y-2 overflow-y-auto pr-2 flex-1 min-h-0">
+          <div className="space-y-2 overflow-y-auto pr-2 max-h-[420px]">
             {members.map((m) => (
               <div key={m.id} className="grid grid-cols-[36px_minmax(0,1fr)_160px_112px_36px] items-center gap-2 rounded-xl border border-border/50 bg-background/30 p-3">
                 <div className="w-8 text-center text-primary font-semibold">{m.position}</div>
