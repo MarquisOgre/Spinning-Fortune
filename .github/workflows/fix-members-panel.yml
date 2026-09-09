@@ -1,0 +1,43 @@
+name: Fix Members Panel Layout
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, 'Fix Members panel height') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fix collapsed Members section
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/routes/_authenticated/admin.tsx')
+          s = p.read_text()
+          old = 'className="rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col min-h-0 overflow-hidden"'
+          new = 'className="rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col shrink-0 overflow-hidden"'
+          if old not in s:
+              raise SystemExit('Members section class not found')
+          s = s.replace(old, new, 1)
+          old = 'className="space-y-2 overflow-y-auto pr-2 flex-1 min-h-0"'
+          new = 'className="space-y-2 overflow-y-auto pr-2 max-h-[420px]"'
+          if old not in s:
+              raise SystemExit('Members list class not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/routes/_authenticated/admin.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix Members panel height"
+          git push
