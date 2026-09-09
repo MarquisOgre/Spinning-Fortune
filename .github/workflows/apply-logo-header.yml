@@ -1,0 +1,33 @@
+name: Apply Fortune Draw header logo
+
+on:
+  push:
+    paths:
+      - .github/workflows/apply-logo-header.yml
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace header icon with logo.png
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("src/routes/index.tsx")
+          s = p.read_text()
+          old = '''            {settings?.logo_url ? (\n              <img src={settings.logo_url} alt="" className="h-8 w-8 rounded object-cover" />\n            ) : (\n              <Crown className="h-5 w-5 text-primary" />\n            )}'''
+          new = '''            <img src="/logo.png" alt="Fortune Draw" className="h-8 w-8 rounded object-cover" />'''
+          if old not in s:
+              raise SystemExit("Expected header icon block not found")
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Commit change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/routes/index.tsx
+          git commit -m "Use Fortune Draw logo in header [skip ci]"
+          git push
