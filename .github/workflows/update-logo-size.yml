@@ -1,7 +1,9 @@
 name: Update logo size
 
 on:
-  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/update-logo-size.yml'
 
 jobs:
   update:
