@@ -342,7 +342,7 @@ function Index() {
       <header className="border-b border-border/60 bg-card/60 backdrop-blur shrink-0">
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Fortune Draw" className="h-8 w-8 rounded object-cover" />
+            <img src="/logo.png" alt="Fortune Draw" className="h-16 w-16 rounded object-cover" />
             <span className="font-serif text-xl text-gold">
               {settings?.lottery_title ?? "Lucky Draw"}
             </span>
