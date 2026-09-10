@@ -67,7 +67,6 @@ function AdminPage() {
     return data.signedUrl;
   };
 
-  /** Past winners have no recording, so render one (welcome → spin → winner). */
   const buildSpinVideo = async (w: Winner) => {
     if (!settings) return;
     setMakingVideoId(w.id);
@@ -400,7 +399,7 @@ function AdminPage() {
           </section>
         </div>
       </div>
-      <footer className="border-t border-border/60 bg-card/40 shrink-0"><div className="max-w-6xl mx-auto px-6 h-10 flex items-center justify-center text-xs text-muted-foreground">© {new Date().getFullYear()} • Developed with <span className="text-destructive mx-1">♥</span> by <span className="ml-1 font-semibold text-foreground">Dexorzo Creations</span></div></div>
+      <footer className="border-t border-border/60 bg-card/40 shrink-0"><div className="max-w-6xl mx-auto px-6 h-10 flex items-center justify-center text-xs text-muted-foreground">© {new Date().getFullYear()} • Developed with <span className="text-destructive mx-1">♥</span> by <span className="ml-1 font-semibold text-foreground">Dexorzo Creations</span></div></footer>
     </div>
   );
 }
