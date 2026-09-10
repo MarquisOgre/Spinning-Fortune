@@ -27,10 +27,10 @@ import { videoExt } from "@/lib/video-format";
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
     meta: [
-      { title: "Admin Settings — Lucky Draw" },
-      { name: "description", content: "Manage lottery members, spin date, sharing, branding, fonts, and winner popup settings." },
-      { property: "og:title", content: "Admin Settings — Lucky Draw" },
-      { property: "og:description", content: "Admin controls for the monthly lucky draw." },
+      { title: "Admin Settings — Fortune Wheel" },
+      { name: "description", content: "Manage Fortune Wheel settings, members, spin date, sharing, branding, fonts, and winner history." },
+      { property: "og:title", content: "Admin Settings — Fortune Wheel" },
+      { property: "og:description", content: "Admin controls for Fortune Wheel." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -126,12 +126,7 @@ function AdminPage() {
           winners,
           winnerName: member.name,
         });
-        if (blob)
-          videoUrl = await uploadProof(
-            new File([blob], `spin.${videoExt(blob.type)}`, { type: blob.type }),
-            pastMonth,
-            "video",
-          );
+        if (blob) videoUrl = await uploadProof(new File([blob], `spin.${videoExt(blob.type)}`, { type: blob.type }), pastMonth, "video");
       }
     } catch (e) {
       setAddingPast(false);
@@ -163,10 +158,7 @@ function AdminPage() {
     const { error } = await supabase.from("winners").delete().eq("id", w.id);
     if (error) return toast.error(error.message);
     if (w.member_id) {
-      await supabase
-        .from("members")
-        .update({ is_winner: false, status: "active", won_month: null, won_at: null })
-        .eq("id", w.member_id);
+      await supabase.from("members").update({ is_winner: false, status: "active", won_month: null, won_at: null }).eq("id", w.member_id);
     }
     toast.success("Winner entry removed");
     reload();
@@ -190,11 +182,7 @@ function AdminPage() {
 
   const addMember = async () => {
     const nextPos = (members.at(-1)?.position ?? 0) + 1;
-    const { data, error } = await supabase
-      .from("members")
-      .insert({ name: `Member ${nextPos}`, position: nextPos, status: "active" })
-      .select()
-      .single();
+    const { data, error } = await supabase.from("members").insert({ name: `Member ${nextPos}`, position: nextPos, status: "active" }).select().single();
     if (error) return toast.error(error.message);
     setMembers((p) => [...p, data as Member]);
   };
@@ -209,10 +197,7 @@ function AdminPage() {
     if (!confirm("Reset all winners? This clears winner flags on members and deletes winner history.")) return;
     const zero = "00000000-0000-0000-0000-000000000000";
     const { error: e1 } = await supabase.from("winners").delete().neq("id", zero);
-    const { error: e2 } = await supabase
-      .from("members")
-      .update({ is_winner: false, status: "active", won_month: null, won_at: null })
-      .neq("id", zero);
+    const { error: e2 } = await supabase.from("members").update({ is_winner: false, status: "active", won_month: null, won_at: null }).neq("id", zero);
     if (e1 || e2) return toast.error((e1 || e2)?.message ?? "Unable to reset cycle");
     toast.success("Cycle reset");
     reload();
@@ -235,10 +220,7 @@ function AdminPage() {
     }).eq("id", 1);
     if (sErr) { toast.error(sErr.message); setSaving(false); return; }
     for (const m of members) {
-      const { error } = await supabase
-        .from("members")
-        .update({ name: m.name, phone: m.phone, position: m.position, status: m.status })
-        .eq("id", m.id);
+      const { error } = await supabase.from("members").update({ name: m.name, phone: m.phone, position: m.position, status: m.status }).eq("id", m.id);
       if (error) { toast.error(error.message); setSaving(false); return; }
     }
     document.documentElement.dataset.font = settings.font_family;
@@ -251,31 +233,29 @@ function AdminPage() {
     navigate({ to: "/" });
   };
 
-  if (loading || !settings) {
-    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
-  }
+  if (loading || !settings) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
 
   return (
-    <div className="h-screen overflow-hidden bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col admin-page">
       <header className="border-b border-border/60 bg-card/40 backdrop-blur shrink-0">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-primary">
-            <ArrowLeft className="h-4 w-4" /> Back to wheel
+        <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 min-h-16 py-3 sm:py-0 flex items-center justify-between gap-3 admin-header-inner">
+          <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-primary shrink-0 min-w-0">
+            <ArrowLeft className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">Back to wheel</span>
+            <span className="sm:hidden text-sm">Back</span>
           </Link>
-          <h1 className="text-2xl text-gold font-serif">Admin Panel</h1>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={signOut}><LogOut className="h-4 w-4 mr-2" /> Sign out</Button>
+          <h1 className="text-xl sm:text-2xl text-gold font-serif text-center whitespace-nowrap">Admin Panel</h1>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme"><span className="sr-only">Toggle theme</span>{theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button>
+            <Button variant="ghost" size="sm" onClick={signOut}><LogOut className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Sign out</span></Button>
           </div>
         </div>
       </header>
 
-      <div className="flex-1 min-h-0 max-w-6xl w-full mx-auto px-6 py-6 grid lg:grid-cols-3 gap-8 overflow-hidden">
-        <section className="lg:col-span-1 rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col min-h-0">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 admin-main">
+        <section className="rounded-2xl border border-border/60 bg-card/80 p-4 sm:p-6 flex flex-col min-w-0 admin-settings-card">
           <h2 className="text-xl font-semibold text-gold shrink-0">Settings</h2>
-          <div className="mt-4 space-y-4 overflow-y-auto pr-2 flex-1 min-h-0">
+          <div className="mt-4 space-y-4 pr-0 sm:pr-2 admin-settings-fields">
             <div><Label>Lottery Title</Label><Input value={settings.lottery_title} onChange={(e) => setSettings({ ...settings, lottery_title: e.target.value })} /></div>
             <div><Label>Prize Amount</Label><Input value={settings.prize_amount ?? ""} placeholder="e.g. ₹50,000" onChange={(e) => setSettings({ ...settings, prize_amount: e.target.value })} /></div>
             <div><Label>Spin Day of Month (1–28)</Label><Input type="number" min={1} max={28} value={settings.spin_day} onChange={(e) => setSettings({ ...settings, spin_day: Math.max(1, Math.min(28, Number(e.target.value) || 1)) })} /><p className="text-xs text-muted-foreground mt-1">The wheel unlocks only on this date each month.</p></div>
@@ -298,108 +278,103 @@ function AdminPage() {
             <div><Label>Logo URL</Label><Input value={settings.logo_url ?? ""} placeholder="https://…/logo.png" onChange={(e) => setSettings({ ...settings, logo_url: e.target.value })} /></div>
             <div><Label>Favicon URL</Label><Input value={settings.favicon_url ?? ""} placeholder="https://…/favicon.png" onChange={(e) => setSettings({ ...settings, favicon_url: e.target.value })} /></div>
           </div>
-          <div className="mt-4 space-y-3 shrink-0">
-            <Button onClick={saveAll} disabled={saving} className="w-full bg-gold text-primary-foreground font-semibold"><Save className="h-4 w-4 mr-2" /> {saving ? "Saving…" : "Save all"}</Button>
-            <Button variant="outline" onClick={resetWinners} className="w-full"><RotateCcw className="h-4 w-4 mr-2" /> Reset cycle</Button>
+          <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 shrink-0">
+            <Button onClick={saveAll} disabled={saving} className="w-full bg-gold text-primary-foreground font-semibold h-11"><Save className="h-4 w-4 mr-2" /> {saving ? "Saving…" : "Save all"}</Button>
+            <Button variant="outline" onClick={resetWinners} className="w-full h-11"><RotateCcw className="h-4 w-4 mr-2" /> Reset cycle</Button>
           </div>
         </section>
 
-        <div className="lg:col-span-2 flex flex-col gap-6 min-h-0 overflow-y-auto pr-1">
-          <section className="rounded-2xl border border-border/60 bg-card/80 p-6 flex flex-col flex-none min-h-[140px] overflow-hidden">
-            <div className="flex items-center justify-between mb-4 shrink-0 rounded-lg border border-border/50 bg-background/30 p-3">
+        <div className="lg:col-span-2 flex flex-col gap-4 sm:gap-6 min-w-0 admin-content">
+          <section className="rounded-2xl border border-border/60 bg-card/80 p-4 sm:p-6 flex flex-col min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 rounded-lg border border-border/50 bg-background/30 p-3 sm:p-3">
               <h2 className="text-xl font-semibold text-gold">Members ({members.length})</h2>
-              <Button size="sm" onClick={addMember} disabled={members.length >= 20}><Plus className="h-4 w-4 mr-1" /> Add member</Button>
+              <Button size="sm" onClick={addMember} disabled={members.length >= 20} className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-1" /> Add member</Button>
             </div>
             {members.length === 0 && <p className="text-sm text-muted-foreground">No members yet. Add up to 20.</p>}
-            <div className="space-y-2 overflow-y-auto pr-2 max-h-[420px] min-h-0">
+            <div className="space-y-3 admin-members-list">
               {members.map((m) => (
-                <div key={m.id} className="grid grid-cols-[36px_minmax(0,1fr)_160px_112px_36px] items-center gap-2 rounded-xl border border-border/50 bg-background/30 p-3">
+                <div key={m.id} className="grid grid-cols-[32px_minmax(0,1fr)_36px] sm:grid-cols-[36px_minmax(0,1fr)_160px_112px_36px] items-center gap-2 rounded-xl border border-border/50 bg-background/30 p-3 min-w-0">
                   <div className="w-8 text-center text-primary font-semibold">{m.position}</div>
-                  <Input value={m.name} onChange={(e) => updateMember(m.id, { name: e.target.value })} className="min-w-0" />
-                  <Input value={m.phone ?? ""} placeholder="Phone" onChange={(e) => updateMember(m.id, { phone: e.target.value })} />
-                  <select value={m.status} onChange={(e) => updateMember(m.id, { status: e.target.value as Member["status"] })} className="h-9 text-xs rounded-md border border-input bg-background px-2 py-1.5">
-                    <option value="active">Active</option><option value="inactive">Inactive</option><option value="used">Used</option>
-                  </select>
-                  <Button size="icon" variant="ghost" onClick={() => deleteMember(m.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  <Input value={m.name} onChange={(e) => updateMember(m.id, { name: e.target.value })} className="min-w-0 w-full" placeholder="Member name" />
+                  <div className="col-span-2 sm:col-span-1 flex gap-2 min-w-0 sm:contents">
+                    <Input value={m.phone ?? ""} placeholder="Phone" onChange={(e) => updateMember(m.id, { phone: e.target.value })} className="min-w-0 flex-1" />
+                    <select value={m.status} onChange={(e) => updateMember(m.id, { status: e.target.value as Member["status"] })} className="h-9 min-w-0 flex-1 sm:w-auto sm:flex-none text-xs rounded-md border border-input bg-background px-2 py-1.5">
+                      <option value="active">Active</option><option value="inactive">Inactive</option><option value="used">Used</option>
+                    </select>
+                  </div>
+                  <Button size="icon" variant="ghost" onClick={() => deleteMember(m.id)} aria-label={`Delete ${m.name}`} className="shrink-0"><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </div>
               ))}
             </div>
           </section>
 
-          <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shrink-0">
+          <section className="rounded-2xl border border-border/60 bg-card/80 p-4 sm:p-5 shrink-0">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-gold">Spin Control</h2>
-                <p className="text-xs text-muted-foreground mt-1">Choose who the wheel should stop at for the next draw.</p>
-              </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <select
-                  id="admin-forced-winner"
-                  value={forcedWinnerId}
-                  onChange={(e) => setForcedWinnerId(e.target.value)}
-                  className="h-10 flex-1 sm:min-w-[190px] rounded-md border border-input bg-background px-3 text-sm"
-                >
+              <div className="min-w-0"><h2 className="text-lg font-semibold text-gold">Spin Control</h2><p className="text-xs text-muted-foreground mt-1">Choose who the wheel should stop at for the next draw.</p></div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                <select id="admin-forced-winner" value={forcedWinnerId} onChange={(e) => setForcedWinnerId(e.target.value)} className="h-10 w-full sm:min-w-[190px] rounded-md border border-input bg-background px-3 text-sm">
                   <option value="random">Random member</option>
-                  {members.filter((m) => m.status === "active" && !m.is_winner).map((m) => (
-                    <option key={m.id} value={m.id}>{`#${m.position} ${m.name}`}</option>
-                  ))}
+                  {members.filter((m) => m.status === "active" && !m.is_winner).map((m) => <option key={m.id} value={m.id}>{`#${m.position} ${m.name}`}</option>)}
                 </select>
-                <Button onClick={saveSpinControl} className="h-10 bg-gold text-primary-foreground font-semibold shrink-0">
-                  <Save className="h-4 w-4 mr-2" /> SAVE
-                </Button>
+                <Button onClick={saveSpinControl} className="h-10 w-full sm:w-auto bg-gold text-primary-foreground font-semibold shrink-0"><Save className="h-4 w-4 mr-2" /> SAVE</Button>
               </div>
             </div>
           </section>
 
-          <section className="rounded-2xl border border-border/60 bg-card/80 p-6 shrink-0">
+          <section className="rounded-2xl border border-border/60 bg-card/80 p-4 sm:p-6 shrink-0 min-w-0">
             <h2 className="text-xl font-semibold text-gold flex items-center gap-2"><History className="h-5 w-5" /> Past Winners</h2>
             <p className="text-xs text-muted-foreground mt-1">Record winners from earlier months so the Hall of Winners shows correct month numbers and proofs.</p>
-            <div className="mt-4 grid sm:grid-cols-2 gap-3">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><Label>Month</Label><Input type="month" value={pastMonth} onChange={(e) => setPastMonth(e.target.value)} /></div>
-              <div>
-                <Label>Winner</Label>
-                <select value={pastMemberId} onChange={(e) => setPastMemberId(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
-                  <option value="">Select member…</option>
-                  {members.map((m) => <option key={m.id} value={m.id}>#{m.position} {m.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <Label>Proof Image (optional)</Label>
-                <Input type="file" accept="image/*" onChange={(e) => setPastImageFile(e.target.files?.[0] ?? null)} className="cursor-pointer" />
-                {pastImageFile && <p className="text-xs text-muted-foreground mt-1 truncate">{pastImageFile.name}</p>}
-              </div>
-              <div>
-                <Label>Spin Video (optional)</Label>
-                <Input type="file" accept="video/*" onChange={(e) => setPastVideoFile(e.target.files?.[0] ?? null)} className="cursor-pointer" />
-                {pastVideoFile && <p className="text-xs text-muted-foreground mt-1 truncate">{pastVideoFile.name}</p>}
-              </div>
+              <div><Label>Winner</Label><select value={pastMemberId} onChange={(e) => setPastMemberId(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm"><option value="">Select member…</option>{members.map((m) => <option key={m.id} value={m.id}>#{m.position} {m.name}</option>)}</select></div>
+              <div><Label>Proof Image (optional)</Label><Input type="file" accept="image/*" onChange={(e) => setPastImageFile(e.target.files?.[0] ?? null)} className="cursor-pointer w-full text-xs" />{pastImageFile && <p className="text-xs text-muted-foreground mt-1 truncate">{pastImageFile.name}</p>}</div>
+              <div><Label>Spin Video (optional)</Label><Input type="file" accept="video/*" onChange={(e) => setPastVideoFile(e.target.files?.[0] ?? null)} className="cursor-pointer w-full text-xs" />{pastVideoFile && <p className="text-xs text-muted-foreground mt-1 truncate">{pastVideoFile.name}</p>}</div>
             </div>
-            <Button onClick={addPastWinner} disabled={addingPast} className="mt-4 bg-gold text-primary-foreground font-semibold">
-              <Plus className="h-4 w-4 mr-1" /> {addingPast ? "Adding…" : "Add past winner"}
-            </Button>
+            <Button onClick={addPastWinner} disabled={addingPast} className="mt-4 w-full sm:w-auto bg-gold text-primary-foreground font-semibold"><Plus className="h-4 w-4 mr-1" /> {addingPast ? "Adding…" : "Add past winner"}</Button>
 
-            <div className="mt-5 space-y-2">
+            <div className="mt-5 space-y-2 admin-winners-list">
               {winners.length === 0 && <p className="text-sm text-muted-foreground">No winner history yet.</p>}
               {winners.map((w) => (
-                <div key={w.id} className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/30 p-3">
-                  <div className="text-xs uppercase tracking-widest text-muted-foreground w-40 shrink-0">
-                    {ordinal(monthNumber(settings.start_month, w.month_year))} Month · {monthKeyLabel(w.month_year)}
-                  </div>
+                <div key={w.id} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-border/50 bg-background/30 p-3 min-w-0">
+                  <div className="text-xs uppercase tracking-widest text-muted-foreground sm:w-40 shrink-0">{ordinal(monthNumber(settings.start_month, w.month_year))} Month · {monthKeyLabel(w.month_year)}</div>
                   <div className="flex-1 min-w-0 truncate font-semibold">{w.member_name}</div>
-                  {w.image_url && <a href={w.image_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Image</a>}
-                  {w.video_url && <a href={w.video_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Video</a>}
-                  <Button size="sm" variant="outline" onClick={() => buildSpinVideo(w)} disabled={makingVideoId === w.id}>
-                    <Video className="h-3.5 w-3.5 mr-1" />
-                    {makingVideoId === w.id ? "Recording…" : w.video_url ? "Regenerate video" : "Create spin video"}
-                  </Button>
-                  <Button size="icon" variant="ghost" onClick={() => deleteWinner(w)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {w.image_url && <a href={w.image_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Image</a>}
+                    {w.video_url && <a href={w.video_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Video</a>}
+                    <Button size="sm" variant="outline" onClick={() => buildSpinVideo(w)} disabled={makingVideoId === w.id}><Video className="h-3.5 w-3.5 mr-1" />{makingVideoId === w.id ? "Recording…" : w.video_url ? "Regenerate video" : "Create spin video"}</Button>
+                    <Button size="icon" variant="ghost" onClick={() => deleteWinner(w)} aria-label={`Delete winner ${w.member_name}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </div>
                 </div>
               ))}
             </div>
           </section>
         </div>
-      </div>
-      <footer className="border-t border-border/60 bg-card/40 shrink-0"><div className="max-w-6xl mx-auto px-6 h-10 flex items-center justify-center text-xs text-muted-foreground">© {new Date().getFullYear()} • Developed with <span className="text-destructive mx-1">♥</span> by <span className="ml-1 font-semibold text-foreground">Dexorzo Creations</span></div></footer>
+      </main>
+      <footer className="border-t border-border/60 bg-card/40 shrink-0"><div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-10 py-2 flex items-center justify-center text-xs text-muted-foreground text-center">© {new Date().getFullYear()} • Developed with <span className="text-destructive mx-1">♥</span> by <span className="ml-1 font-semibold text-foreground">Dexorzo Creations</span></div></footer>
+      <style>{`
+        .admin-page { overflow-x: hidden; }
+        .admin-main { overflow: visible; }
+        @media (min-width: 1024px) {
+          .admin-main { min-height: 0; overflow: hidden; }
+          .admin-settings-card { min-height: 0; }
+          .admin-settings-fields { overflow-y: auto; flex: 1; min-height: 0; }
+          .admin-content { min-height: 0; overflow-y: auto; overflow-x: hidden; padding-right: 4px; }
+          .admin-members-list { overflow-y: auto; max-height: 420px; }
+        }
+        @media (max-width: 1023px) {
+          .admin-settings-fields { overflow: visible; }
+          .admin-members-list, .admin-winners-list { overflow: visible; }
+        }
+        @media (max-width: 639px) {
+          .admin-header-inner { min-height: 60px; }
+          .admin-header-inner h1 { font-size: 1.25rem; }
+          .admin-settings-card, .admin-content > section { border-radius: 18px; }
+          .admin-settings-card { padding: 16px; }
+          .admin-main { padding-top: 14px; padding-bottom: 18px; }
+          .admin-members-list > div { padding: 10px; }
+          .admin-content { gap: 14px; }
+        }
+      `}</style>
     </div>
   );
 }
