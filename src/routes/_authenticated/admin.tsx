@@ -175,9 +175,15 @@ function AdminPage() {
 
   useEffect(() => { reload(); }, []);
 
-  useEffect(() => {
+  const saveSpinControl = () => {
     window.localStorage.setItem("lucky-draw-forced-winner", forcedWinnerId);
-  }, [forcedWinnerId]);
+    if (forcedWinnerId === "random") {
+      toast.success("Spin Control saved: Random member");
+      return;
+    }
+    const member = members.find((m) => m.id === forcedWinnerId);
+    toast.success(`Spin Control saved${member ? ` for #${member.position} ${member.name}` : ""}`);
+  };
 
   const updateMember = (id: string, patch: Partial<Member>) => {
     setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
@@ -322,22 +328,27 @@ function AdminPage() {
           </section>
 
           <section className="rounded-2xl border border-border/60 bg-card/80 p-5 shrink-0">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-gold">Spin Control</h2>
                 <p className="text-xs text-muted-foreground mt-1">Choose who the wheel should stop at for the next draw.</p>
               </div>
-              <select
-                id="admin-forced-winner"
-                value={forcedWinnerId}
-                onChange={(e) => setForcedWinnerId(e.target.value)}
-                className="h-10 min-w-[190px] rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option value="random">Random member</option>
-                {members.filter((m) => m.status === "active" && !m.is_winner).map((m) => (
-                  <option key={m.id} value={m.id}>{`#${m.position} ${m.name}`}</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <select
+                  id="admin-forced-winner"
+                  value={forcedWinnerId}
+                  onChange={(e) => setForcedWinnerId(e.target.value)}
+                  className="h-10 flex-1 sm:min-w-[190px] rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="random">Random member</option>
+                  {members.filter((m) => m.status === "active" && !m.is_winner).map((m) => (
+                    <option key={m.id} value={m.id}>{`#${m.position} ${m.name}`}</option>
+                  ))}
+                </select>
+                <Button onClick={saveSpinControl} className="h-10 bg-gold text-primary-foreground font-semibold shrink-0">
+                  <Save className="h-4 w-4 mr-2" /> SAVE
+                </Button>
+              </div>
             </div>
           </section>
 
@@ -389,7 +400,7 @@ function AdminPage() {
           </section>
         </div>
       </div>
-      <footer className="border-t border-border/60 bg-card/40 shrink-0"><div className="max-w-6xl mx-auto px-6 h-10 flex items-center justify-center text-xs text-muted-foreground">© {new Date().getFullYear()} • Developed with <span className="text-destructive mx-1">♥</span> by <span className="ml-1 font-semibold text-foreground">Dexorzo Creations</span></div></footer>
+      <footer className="border-t border-border/60 bg-card/40 shrink-0"><div className="max-w-6xl mx-auto px-6 h-10 flex items-center justify-center text-xs text-muted-foreground">© {new Date().getFullYear()} • Developed with <span className="text-destructive mx-1">♥</span> by <span className="ml-1 font-semibold text-foreground">Dexorzo Creations</span></div></div>
     </div>
   );
 }
