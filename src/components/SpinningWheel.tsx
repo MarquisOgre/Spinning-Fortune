@@ -114,8 +114,23 @@ export const SpinningWheel = forwardRef<WheelHandle, Props>(function SpinningWhe
       new Promise<void>((resolve) => {
         const n = members.length;
         if (n === 0) return resolve();
+
+        // Read the forced winner at the moment the wheel actually starts.
+        // This keeps the wheel synchronized when Admin Panel and the home
+        // page are open in different tabs.
+        let targetIndex = index;
+        if (typeof window !== "undefined") {
+          const forcedId = window.localStorage.getItem("lucky-draw-forced-winner");
+          if (forcedId && forcedId !== "random") {
+            const forcedIndex = members.findIndex(
+              (m) => m.id === forcedId && m.status === "active" && !m.is_winner,
+            );
+            if (forcedIndex >= 0) targetIndex = forcedIndex;
+          }
+        }
+
         const step = (Math.PI * 2) / n;
-        const targetSlice = -Math.PI / 2 - (index * step + step / 2);
+        const targetSlice = -Math.PI / 2 - (targetIndex * step + step / 2);
         const fullTurns = 6 + Math.floor(Math.random() * 3);
         const start = rotRef.current;
         const tau = Math.PI * 2;
@@ -167,7 +182,6 @@ export const SpinningWheel = forwardRef<WheelHandle, Props>(function SpinningWhe
           }
         }
         @media (max-width: 767px) {
-          /* Mobile must use normal document flow so the entire home page can scroll. */
           .mobile-home-scroll {
             height: auto !important;
             min-height: 100dvh !important;
@@ -226,7 +240,7 @@ export const SpinningWheel = forwardRef<WheelHandle, Props>(function SpinningWhe
 });
 
 function truncate(s: string, n: number) {
-  return s.length > n ? s.slice(0, n - 1) + "\u2026" : s;
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
 
 function shade(hex: string, pct: number) {
