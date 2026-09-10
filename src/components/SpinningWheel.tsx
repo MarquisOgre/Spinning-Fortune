@@ -166,6 +166,43 @@ export const SpinningWheel = forwardRef<WheelHandle, Props>(function SpinningWhe
             font-size: clamp(0.85rem, 1.7vw, 1.2rem) !important;
           }
         }
+        @media (max-width: 767px) {
+          /* Mobile must use normal document flow so the entire home page can scroll. */
+          .mobile-home-scroll {
+            height: auto !important;
+            min-height: 100dvh !important;
+            overflow-x: hidden !important;
+            overflow-y: visible !important;
+          }
+          .mobile-home-main {
+            flex: none !important;
+            min-height: auto !important;
+            height: auto !important;
+            overflow: visible !important;
+          }
+          .mobile-home-main > main {
+            flex: none !important;
+            min-height: auto !important;
+          }
+          .spinning-wheel-root {
+            width: min(92vw, 360px) !important;
+            max-width: min(92vw, 360px) !important;
+            aspect-ratio: 1 / 1;
+            margin-top: 0 !important;
+          }
+          main:has(.spinning-wheel-root) {
+            justify-content: flex-start !important;
+            overflow: visible !important;
+            padding-bottom: 0 !important;
+          }
+          main:has(.spinning-wheel-root) > .mt-4 {
+            margin-top: 14px !important;
+          }
+          main:has(.spinning-wheel-root) > .mt-4 h1 {
+            white-space: normal !important;
+            line-height: 1.2 !important;
+          }
+        }
       `}</style>
       <div className="spinning-wheel-root relative w-full max-w-[min(440px,55vh,100%)] aspect-square mx-auto shrink-0">
         <canvas
