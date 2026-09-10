@@ -4,20 +4,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/*
- * Design system definition.
- *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
- *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
- *
- * To add a new semantic color:
- * 1. Add the variable to :root (light value) and .dark (dark value)
- * 2. Register it in @theme inline as --color-<name>: var(--<name>)
- */
-
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -65,7 +51,6 @@
 
 :root {
   --radius: 0.625rem;
-  /* Warm Parchment — light */
   --background: oklch(0.975 0.012 85);
   --foreground: oklch(0.24 0.02 55);
   --card: oklch(0.99 0.008 85);
@@ -110,7 +95,6 @@
 }
 
 .dark {
-  /* Warm Parchment — dark (softened, not black) */
   --background: oklch(0.19 0.015 55);
   --foreground: oklch(0.94 0.02 85);
   --card: oklch(0.23 0.018 55);
@@ -155,95 +139,80 @@
 }
 
 @layer base {
-  * {
-    border-color: var(--color-border);
-  }
-
+  * { border-color: var(--color-border); box-sizing: border-box; }
+  html, body, #root { min-height: 100%; }
   body {
+    margin: 0;
     background-color: var(--color-background);
     color: var(--color-foreground);
     background-image: var(--gradient-spot);
     background-attachment: fixed;
     font-family: 'Manrope', 'Inter', ui-sans-serif, system-ui, sans-serif;
+    overflow-x: hidden;
   }
-  h1, h2, h3, h4 {
-    font-family: 'Sora', 'Manrope', ui-sans-serif, system-ui, sans-serif;
-    letter-spacing: 0;
-  }
+  img, canvas, svg, video { max-width: 100%; }
+  h1, h2, h3, h4 { font-family: 'Sora', 'Manrope', ui-sans-serif, system-ui, sans-serif; letter-spacing: 0; }
 }
 
 html[data-font="modern"] body,
-html[data-font="modern"] .font-serif {
-  font-family: 'Sora', 'Manrope', ui-sans-serif, system-ui, sans-serif;
-}
-
+html[data-font="modern"] .font-serif { font-family: 'Sora', 'Manrope', ui-sans-serif, system-ui, sans-serif; }
 html[data-font="clean"] body,
-html[data-font="clean"] .font-serif {
-  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-}
-
+html[data-font="clean"] .font-serif { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
 html[data-font="classic"] body,
-html[data-font="classic"] .font-serif {
-  font-family: 'Lora', 'Playfair Display', ui-serif, Georgia, serif;
-}
-
+html[data-font="classic"] .font-serif { font-family: 'Lora', 'Playfair Display', ui-serif, Georgia, serif; }
 html[data-font="elegant"] body,
-html[data-font="elegant"] .font-serif {
-  font-family: 'Playfair Display', 'Cormorant Garamond', ui-serif, Georgia, serif;
-}
+html[data-font="elegant"] .font-serif { font-family: 'Playfair Display', 'Cormorant Garamond', ui-serif, Georgia, serif; }
+html[data-font="modern"] h1, html[data-font="modern"] h2, html[data-font="modern"] h3, html[data-font="modern"] h4 { font-family: 'Sora', 'Manrope', ui-sans-serif, system-ui, sans-serif; }
+html[data-font="clean"] h1, html[data-font="clean"] h2, html[data-font="clean"] h3, html[data-font="clean"] h4 { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+html[data-font="classic"] h1, html[data-font="classic"] h2, html[data-font="classic"] h3, html[data-font="classic"] h4 { font-family: 'Playfair Display', 'Lora', ui-serif, Georgia, serif; }
+html[data-font="elegant"] h1, html[data-font="elegant"] h2, html[data-font="elegant"] h3, html[data-font="elegant"] h4 { font-family: 'Playfair Display', 'Cormorant Garamond', ui-serif, Georgia, serif; }
 
-html[data-font="modern"] h1,
-html[data-font="modern"] h2,
-html[data-font="modern"] h3,
-html[data-font="modern"] h4 {
-  font-family: 'Sora', 'Manrope', ui-sans-serif, system-ui, sans-serif;
-}
+* { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--primary) 55%, transparent) transparent; }
 
-html[data-font="clean"] h1,
-html[data-font="clean"] h2,
-html[data-font="clean"] h3,
-html[data-font="clean"] h4 {
-  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-}
+@utility text-gold { background: var(--gradient-gold); -webkit-background-clip: text; background-clip: text; color: transparent; }
+@utility bg-gold { background: var(--gradient-gold); }
 
-html[data-font="classic"] h1,
-html[data-font="classic"] h2,
-html[data-font="classic"] h3,
-html[data-font="classic"] h4 {
-  font-family: 'Playfair Display', 'Lora', ui-serif, Georgia, serif;
-}
-
-html[data-font="elegant"] h1,
-html[data-font="elegant"] h2,
-html[data-font="elegant"] h3,
-html[data-font="elegant"] h4 {
-  font-family: 'Playfair Display', 'Cormorant Garamond', ui-serif, Georgia, serif;
-}
-
-* {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklab, var(--primary) 55%, transparent) transparent;
-}
-
-@utility text-gold {
-  background: var(--gradient-gold);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-@utility bg-gold {
-  background: var(--gradient-gold);
-}
-
-@keyframes shimmer {
-  0%, 100% { opacity: 0.9; }
-  50% { opacity: 1; filter: brightness(1.2); }
-}
-@keyframes pop-in {
-  0% { transform: scale(0.5); opacity: 0; }
-  60% { transform: scale(1.1); opacity: 1; }
-  100% { transform: scale(1); }
-}
+@keyframes shimmer { 0%, 100% { opacity: 0.9; } 50% { opacity: 1; filter: brightness(1.2); } }
+@keyframes pop-in { 0% { transform: scale(0.5); opacity: 0; } 60% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); } }
 .animate-shimmer { animation: shimmer 2s ease-in-out infinite; }
 .animate-pop-in { animation: pop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* Responsive home layout helpers. Desktop composition remains unchanged. */
+@media (max-width: 1023px) {
+  .mobile-home-scroll { overflow-y: auto !important; overflow-x: hidden !important; }
+}
+
+@media (max-width: 767px) {
+  body { background-attachment: scroll; }
+  .mobile-home-header { height: auto !important; min-height: 64px; padding-top: max(0.5rem, env(safe-area-inset-top)); padding-bottom: 0.5rem; }
+  .mobile-home-header .mobile-home-nav { gap: 0.25rem; flex-wrap: wrap; justify-content: flex-end; }
+  .mobile-home-header .mobile-home-logo { width: 2.75rem !important; height: 2.75rem !important; }
+  .mobile-home-header .mobile-home-title { font-size: 1rem !important; line-height: 1.15; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .mobile-home-main { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 1rem !important; overflow: visible !important; min-height: 0 !important; padding: 0.75rem 0.75rem 1.25rem !important; }
+  .mobile-home-main > aside, .mobile-home-main > main { width: 100%; min-width: 0; height: auto !important; overflow: visible !important; }
+  .mobile-home-main > aside:first-child { order: 2; }
+  .mobile-home-main > main { order: 1; }
+  .mobile-home-main > aside:last-child { order: 3; }
+  .mobile-home-main > aside { padding: 0.75rem !important; border-radius: 1rem !important; }
+  .mobile-home-members { max-height: none !important; display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.35rem !important; overflow: visible !important; }
+  .mobile-home-members li { min-width: 0; }
+  .mobile-home-main h2 { margin-bottom: 0.35rem !important; }
+  .mobile-home-main p { line-height: 1.4; }
+
+  .mobile-wheel-stage { width: min(92vw, 26rem) !important; max-width: 100% !important; margin-inline: auto; }
+  .mobile-wheel-heading { margin-top: 0.5rem !important; width: 100%; }
+  .mobile-wheel-heading > h1 { white-space: normal !important; max-width: 100%; font-size: clamp(1.2rem, 6vw, 1.65rem) !important; line-height: 1.15 !important; }
+  .mobile-wheel-heading > button { width: 100%; max-width: 22rem; }
+  .mobile-home-footer { min-height: 3.5rem; height: auto !important; padding: 0.65rem 0.75rem; text-align: center; }
+  .mobile-home-dialog { width: calc(100vw - 1rem) !important; max-width: 28rem !important; max-height: calc(100dvh - 1rem); overflow-y: auto; margin: 0.5rem; padding: 1.25rem !important; }
+  .mobile-home-dialog h2 { font-size: clamp(1.45rem, 7vw, 2rem) !important; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .mobile-home-main { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; align-items: start !important; overflow: visible !important; min-height: auto !important; }
+  .mobile-home-main > main { grid-column: 1 / -1; grid-row: 1; }
+  .mobile-home-main > aside:first-child { grid-column: 1; grid-row: 2; height: auto !important; }
+  .mobile-home-main > aside:last-child { grid-column: 2; grid-row: 2; height: auto !important; }
+  .mobile-wheel-stage { width: min(70vw, 30rem) !important; max-width: 100% !important; }
+}
